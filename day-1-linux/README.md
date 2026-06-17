@@ -27,6 +27,11 @@ Kiểm tra kết quả câu 4 bằng lệnh
 ```bash
 cat system-info.txt
 ```
+
+Nếu muốn đếm cả file trong /var/log/private
+```bash
+sudo ./lab.sh
+```
 3. Cách chạy file backup.sh
 Xem hướng dẫn sử dụng (Help Flag)
 ```bash
