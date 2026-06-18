@@ -18,7 +18,6 @@ show_help() {
     echo "  ./backup.sh ~/work"
 }
 
-# --- KIỂM TRA THAM SỐ ĐẦU VÀO ---
 # Nếu không truyền tham số nào ($# == 0), hiển thị trợ giúp và thoát lỗi
 if [ $# -eq 0 ]; then
     echo "Lỗi: Thiếu tham số truyền vào."
@@ -26,7 +25,6 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-# Kiểm tra nếu người dùng truyền flag yêu cầu trợ giúp
 case "$1" in
     -h|--help)
         show_help
@@ -47,12 +45,10 @@ fi
 # Tự động tạo thư mục ~/backups nếu chưa có (-p giúp không báo lỗi nếu đã tồn tại)
 mkdir -p "$BACKUP_DIR"
 
-# --- THU THẬP THÔNG TIN TRƯỚC KHI BACKUP ---
-# Lấy tên rút gọn của thư mục (ví dụ: /home/tien/work -> work)
 DIR_NAME=$(basename "$TARGET_DIR")
 # Tạo chuỗi thời gian định dạng YYYYMMDD-HHMMSS
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-# Đặt tên file nén theo đúng format đề bài yêu cầu
+# Đặt tên file nén theo đúng format 
 BACKUP_FILE="${BACKUP_DIR}/${DIR_NAME}-${TIMESTAMP}.tar.gz"
 
 # Tính toán số lượng file và tổng dung lượng của thư mục mục tiêu
