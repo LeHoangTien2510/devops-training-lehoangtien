@@ -24,10 +24,7 @@ echo "====================================================================="
 while true; do
     TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-    # 1. Lấy % CPU tổng đang sử dụng
-    # Cách tính: 100% trừ đi % của idle (thời gian CPU rảnh lấy từ lệnh top)
-    CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
-
+    CPU_USAGE=$(LC_ALL=C top -bn2 -d 0.5 | grep "Cpu(s)" | tail -1 | awk '{for(i=1;i<=NF;i++) if($i~/[0-9.]*id/) {print int(100 - $i)}}')
     # 2. Lấy % MEM (RAM) tổng đang sử dụng
     # Dùng lệnh free để lấy RAM đã dùng chia cho tổng RAM thực tế
     MEM_USAGE=$(free | grep Mem | awk '{printf "%.2f", $3/$2 * 100}')
