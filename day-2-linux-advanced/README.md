@@ -6,7 +6,7 @@
 
 - **Intern**: `Lê Hoàng Tiến`
 - **Phase / Week / Day**: `Phase 1 / Week 1 / Day 2`
-- **Branch**: `phase-1/week-1/day-1-linux`
+- **Branch**: `phase-1/week-1/day-2-Linux-Advanced`
 - **Submitted at**: `<2026-06-18 15:20>` (timezone +07)
 - **Time spent**: `5`
 
