@@ -1,0 +1,13 @@
+[Unit]
+Description=DevOps Performance Monitoring Script Service
+After=network.target
+
+[Service]
+Type=simple
+User=tien
+ExecStart=/home/tien/work/devops-training-lehoangtien/day-2-linux-advanced/monitor.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
