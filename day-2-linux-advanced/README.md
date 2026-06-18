@@ -87,7 +87,7 @@ sudo journalctl -u monitor.service -n 5
 - Screenshot / log output (kèm trong `./screenshots/`).
 
 ## 4. Khó khăn & cách giải quyết
-
+Lần đầu đối mặt với bash script với systemd nên mất khá nhiều thời gian để hiểu cú pháp.
 ## 5. Reference
 
 ## 6. Self-check
