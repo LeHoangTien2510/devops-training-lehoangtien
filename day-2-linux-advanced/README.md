@@ -7,8 +7,8 @@
 - **Intern**: `Lê Hoàng Tiến`
 - **Phase / Week / Day**: `Phase 1 / Week 1 / Day 2`
 - **Branch**: `phase-1/week-1/day-1-linux`
-- **Submitted at**: `<YYYY-MM-DD HH:MM>` (timezone +07)
-- **Time spent**: `<số giờ>`
+- **Submitted at**: `<2026-06-18 15:20>` (timezone +07)
+- **Time spent**: `5`
 
 ## 1. Mục tiêu
 Làm quen với các câu lệnh linux nâng cao
