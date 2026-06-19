@@ -1,0 +1,52 @@
+Script started on 2026-06-19 11:28:34+07:00 [TERM="xterm-256color" TTY="/dev/pts/10" COLUMNS="118" LINES="12"]
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ [7mgit bisect start[27mgit bisect start
+[?2004l
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ [7mgit bisect bad[27mgit bisect bad
+[?2004l
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ [7mgit bisect good $(git log --reverse --oneline | head -n 1 | awk '{print $1}')[27m
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[Cgit bisect good $(git log --reverse --oneline | head -n 1 | awk '{print $1}')
+[?2004l
+Bisecting: 13 revisions left to test after this (roughly 4 steps)
+[3099f6046dee64df15ab77d2f6bc047412cf12a9] Commit number 6
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ [7mcat app.py[27mcat app.py
+[?2004l
+print('Day la commit thu 6 - Mọi thứ đều ổn')
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ [7mgit bisect good[27mgit bisect good
+[?2004l
+Bisecting: 6 revisions left to test after this (roughly 3 steps)
+[dc3a39d81993d5cdfd24f1dc0573504263d747b1] Commit number 13
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ git bisect good[5Pcat app.py
+[?2004l
+print('Day la commit thu 13 - OOPS! ĐÂY LÀ BUG')
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ [7mgit bisect bad[27mgit bisect bad
+[?2004l
+Bisecting: 3 revisions left to test after this (roughly 2 steps)
+[9f437f6eff7be56e629b66af497cd9090f67e5be] Commit number 9
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ git bisect bad[4Pcat app.pygit bisect good[5Pcat app.py
+[?2004l
+print('Day la commit thu 9 - Mọi thứ đều ổn')
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ cat app.pygit bisect bad[4Pcat app.pygit bisect good
+[?2004l
+Bisecting: 1 revision left to test after this (roughly 1 step)
+[4030dbb783e28c5420ff01431cd164c4c79e32b7] Commit number 11
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ git bisect good[5Pcat app.py
+[?2004l
+print('Day la commit thu 11 - Mọi thứ đều ổn')
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ cat app.pygit bisect good
+[?2004l
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[1a38b73e626962fe67a58eb271aa37892ff6b1ae] Commit number 12
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ git bisect good[5Pcat app.py
+[?2004l
+print('Day la commit thu 12 - Mọi thứ đều ổn')
+[?2004h]0;tien@LAPTOP-TUJDR4JT: ~/work/git-lab[01;32mtien@LAPTOP-TUJDR4JT[00m:[01;34m~/work/git-lab[00m$ cat app.pygit bisect good
+[?2004l
+dc3a39d81993d5cdfd24f1dc0573504263d747b1 is the first bad commit
+[33mcommit dc3a39d81993d5cdfd24f1dc0573504263d747b1[m
+Author: LeHoangTien <tienlehoanghn2005@gmail.com>
+Date:   Fri Jun 19 11:27:59 2026 +0700
+
+    Commit number 13
+
+ app.py | 2 [32m+[m[31m-[m
+ 1 file changed, 1 insertion(+), 1 deletion(-)

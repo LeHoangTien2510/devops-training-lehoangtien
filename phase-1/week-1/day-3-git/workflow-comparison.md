@@ -1,0 +1,6 @@
+| Tiêu chí | Trunk-based | GitFlow | GitHub Flow |
+| :--- | :--- | :--- | :--- |
+| **Số long-lived branch** | Chỉ có 1 nhánh main/master duy nhất, các thành viên cùng commit | Có nhiều nhánh khác nhau và nhiều tầng ví dụ như developer hay feature | 1 nhánh lớn là main duy nhất và các nhánh nhỏ như feature được tạo ra sau đó merge vào nhanh chóng |
+| **Phù hợp scenario nào** | - Dự án yêu cầu hoàn thành nhanh và đội ngũ phải rất có kinh nghiệm | Phù hợp với hầu hết dự án, có quy trình kiểm thử nghiêm ngặt tránh gây lỗi | Dành cho ứng dụng và đội nhóm vừa và nhỏ, tăng tốc độ deliver sản phẩm cho khách hàng |
+| **Release cadence** | Tốc độ deliver cực cao do chỉ có 1 nhánh, deploy liên tục |Do phải trải qua nhiều quy trình để bảo mật nên tốc độ release thấp đến trung bình| Cao: tính năng được đưa thẳng lên production sau khi merge xong từ main, ko trải qua nhiều quy trình |
+| **Khó khăn khi áp dụng** | Chỉ có 1 nhánh nên khi lỗi rất khó sửa, áp lực lớn lên các dev vì ko có quy trình kiểm thử | Cấu trúc quá phức tạp, dễ gây nhầm lẫn khi chuyển qua lại với các nhánh, tốc độ ra sản phẩm chậm | - Nhánh main dễ bị lỗi nếu khâu kiểm tra code trước khi merge làm không kỹ. - Khó quản lý nếu sản phẩm cần hỗ trợ nhiều phiên bản cùng lúc. |
