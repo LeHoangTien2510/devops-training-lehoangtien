@@ -5,7 +5,7 @@
 ## Task: `Day 1 — Linux Fundamentals`
 
 - **Intern**: `Lê Hoàng Tiến`
-- **Phase / Week / Day**: `Phase 1 / Week 1 / Day 1`
+- **Phase / Week / Day**: `Phase 1 / Week 1 / Day 3`
 - **Branch**: `phase-1/week-1/day-3-git`
 - **Submitted at**: `<>` (timezone +07)
 - **Time spent**: `4h`
