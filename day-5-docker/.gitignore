@@ -1,0 +1,12 @@
+# Loại bỏ thư mục node_modules ở bất kỳ cấp nào
+node_modules/
+
+# Loại bỏ các file môi trường chứa thông tin bảo mật/nhạy cảm
+.env
+.env.local
+.env.*.local
+
+# Loại bỏ các file log hệ thống sinh ra khi chạy ứng dụng
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
