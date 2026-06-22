@@ -1,11 +1,11 @@
 # === STAGE 1: Builder ===
-FROM node:20 AS builder
+FROM node:24 AS builder
 WORKDIR /usr/src/app
 # Copy source code vào stage builder 
 COPY app/ ./app/
 
 # === STAGE 2: Runtime ===
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 # Thiết lập các nhãn tiêu chuẩn OCI (org.opencontainers.image.*)
 LABEL org.opencontainers.image.title="Demo Node.js Web App" \

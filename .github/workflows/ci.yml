@@ -71,3 +71,21 @@ jobs:
             ghcr.io/${{ steps.repo_owner.outputs.owner }}/demo-app:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # 1. Thêm step trivy scan image, fail nếu có CVE HIGH hoặc CRITICAL
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/${{ steps.repo_owner.outputs.owner }}/demo-app:sha-${{ github.sha }}'
+          format: 'table'
+          exit-code: '1' # Trả về code 1 để làm FAIL pipeline nếu tìm thấy lỗ hổng
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL' # Chỉ quét và chặn các lỗi ở mức HIGH và CRITICAL
+
+      # 2. Thêm step tạo và upload SBOM dùng syft
+      - name: Generate SBOM using Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: 'ghcr.io/${{ steps.repo_owner.outputs.owner }}/demo-app:sha-${{ github.sha }}'
+          artifact-name: sbom.spdx.json # Tên file định dạng SBOM để lưu trữ
+          output-file: ./sbom.spdx.json
