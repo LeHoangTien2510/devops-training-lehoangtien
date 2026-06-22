@@ -44,23 +44,30 @@ jobs:
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    # Bỏ điều kiện lọc nhánh main đi để nhánh nào push lên cũng được build
-    if: github.event_name == 'push' 
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+      
+      # Step phụ: Tự động chuyển tên owner thành viết thường và lưu vào outputs
+      - name: Open case-insensitive repository owner
+        id: repo_owner
+        run: echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+          
       - uses: docker/build-push-action@v6
         with:
-          context: ./day-5-docker          # Sửa lại đường dẫn này cho đúng vị trí Dockerfile
-          file: ./day-5-docker/Dockerfile  # Chỉ định rõ file Dockerfile nằm ở đâu
+          context: ./day-5-docker
+          file: ./day-5-docker/Dockerfile
           push: true
+          # Gọi lại giá trị đã được viết thường từ outputs của step trên
           tags: |
-            ghcr.io/${{ github.repository_owner }}/demo-app:sha-${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/demo-app:latest
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/demo-app:sha-${{ github.sha }}
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/demo-app:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
