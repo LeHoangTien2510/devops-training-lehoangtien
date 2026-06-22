@@ -4,8 +4,8 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "lint": "echo 'Fake lint: OK'",
-    "test": "echo 'Fake test: OK'",
+    "lint": "eslint .",
+    "test": "node --test",
     "start": "node server.js"
   },
   "keywords": [],
@@ -14,5 +14,8 @@
   "type": "commonjs",
   "dependencies": {
     "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
   }
 }
