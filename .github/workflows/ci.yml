@@ -1,7 +1,9 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: 
+    - main
+    - 'phase-1/week-1/day-5-docker' # Thêm nhánh này vào danh sách trigger
   pull_request:
     branches: [main]
 
@@ -32,7 +34,8 @@ jobs:
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Bỏ điều kiện lọc nhánh main đi để nhánh nào push lên cũng được build
+    if: github.event_name == 'push' 
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -43,8 +46,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
-          context: ./day-5-docker  # Chỉ định ngữ cảnh build nằm trong thư mục day-5-docker
-          file: ./day-5-docker/Dockerfile # Chỉ định đường dẫn chính xác đến Dockerfile
+          context: ./day-5-docker          # Sửa lại đường dẫn này cho đúng vị trí Dockerfile
+          file: ./day-5-docker/Dockerfile  # Chỉ định rõ file Dockerfile nằm ở đâu
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/demo-app:sha-${{ github.sha }}
