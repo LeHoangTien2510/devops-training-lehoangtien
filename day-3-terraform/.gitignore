@@ -1,0 +1,16 @@
+# Chặn thư mục chứa provider và module của terraform
+**/.terraform/
+
+# Chặn các file lưu trạng thái hạ tầng (chứa thông tin bảo mật)
+*.tfstate
+*.tfstate.*
+
+# Chặn các file chứa biến bí mật (Password, Secret Key,...)
+*.tfvars
+*.tfvars.json
+
+# NGOẠI LỆ: Không chặn file biến mẫu (để người khác biết cần điền biến gì)
+!*.tfvars.example
+
+# Nên giữ lại file lock để cố định phiên bản provider
+.terraform.lock.hcl
