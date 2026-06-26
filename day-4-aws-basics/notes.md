@@ -51,3 +51,20 @@ Resource: Tài nguyên cụ thể mà hành động trên được phép tác đ
 Condition: Điều kiện bắt buộc để rule này có hiệu lực. Ở đây sử dụng toán tử "IpAddress" để check biến hệ thống "aws:SourceIp".
 
 Ý nghĩa: Chỉ cho phép thực hiện hành động tải file nếu yêu cầu đó đến từ dải IP nguồn là "203.0.113.0/24". Bất kỳ IP nào nằm ngoài dải này đều bị từ chối.
+
+# 5.
+Kết quả là Deny, bị từ chối vì AWS luôn đặt ưu tiên hơn cho explicit deny thay vì group.
+
+## Part E — VPC topology
+
+![alt text](screenshots/topology.png)
+
+
+Backend phải ở Private Subnet vì:
+
+Bảo mật tối đa: Backend là nơi chứa mã nguồn ứng dụng, xử lý logic nghiệp vụ và kết nối trực tiếp với cơ sở dữ liệu (Database). Đặt Backend ở Private Subnet giúp ẩn hoàn toàn các EC2 instance này khỏi mạng Internet công cộng. Hacker không thể scan IP Public hay tấn công brute-force/DDoS trực tiếp vào các server này.
+
+Khi các server EC2 Backend ở Private Subnet cần đi ra Internet, luồng đi của gói tin Outbound sẽ tuân theo sơ đồ sau:
+EC2 Backend -> Private Route Table(để kiểm tra IP của NAT gateway) -> NAT gateway(đặt ở public subnet, giúp thay đổi ip từ private thành public) -> public route table(Tìm ip của internet gateway) -> Internet Gateway -> Internet
+
+Luồng phản hồi (Inbound Response): Khi Internet trả kết quả về, nó sẽ gửi tới IP Public của NAT Gateway $\rightarrow$ NAT Gateway nhận diện và dịch ngược lại để trả chính xác gói tin về cho EC2 Backend nằm sâu bên trong Private Subnet.
