@@ -1,0 +1,59 @@
+# ==========================================
+# 1. TERRAFORM - CHẶN STATE VÀ FILE NHẠY CẢM
+# ==========================================
+# Chặn thư mục chứa plugin và module đã tải về (rất nặng)
+.terraform/
+.terraform.lock.hcl
+
+# CHẶN BẮT BUỘC: Chặn file lưu trạng thái hạ tầng (Chứa mật khẩu, cấu hình AWS dạng plain text)
+*.tfstate
+*.tfstate.*
+
+# Chặn các file chứa biến bí mật (Mật khẩu, Token, Access Key)
+*.tfvars
+*.tfvars.json
+
+# Chặn file log của Terraform khi debug
+*.tflog
+
+# ==========================================
+# 2. ANSIBLE & ENVIRONMENT - CHẶN MẬT KHẨU VÀ BIẾN MÔI TRƯỜNG
+# ==========================================
+# CHẶN BẮT BUỘC: Chặn tất cả các file cấu hình môi trường local
+.env
+.env.*
+.envrc
+
+# Chặn các file cache, retry và các file chứa thông tin đăng nhập của Ansible
+*.retry
+*.log
+ansible.log
+
+# Chặn cấu hình inventory nếu bạn vô tình điền IP hoặc mật khẩu thật vào đó
+# ansible/inventory.ini (Bỏ comment dòng này nếu bạn muốn chặn hoàn toàn file inventory)
+
+# ==========================================
+# 3. KUBERNETES & CREDENTIALS - CHẶN CHỨNG CHỈ, PHẦN MỀM CÁ NHÂN
+# ==========================================
+# CHẶN BẮT BUỘC: Chặn toàn bộ các file khóa bảo mật, chứng chỉ SSL, SSH keys
+*.pem
+*.key
+*.pub
+*.crt
+kubeconfig
+.kube/
+
+# ==========================================
+# 4. OS & IDE - CHẶN FILE RÁC CỦA HỆ ĐIỀU HÀNH VÀ VS CODE
+# ==========================================
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Hệ điều hành
+.DS_Store
+Thumbs.db
