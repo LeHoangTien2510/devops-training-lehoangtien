@@ -1,3 +1,7 @@
+# =============================================================================
+# TERRAFORM & PROVIDER CONFIG
+# =============================================================================
+
 terraform {
   required_version = ">= 1.5.0"
   required_providers {
@@ -17,11 +21,10 @@ terraform {
 }
 
 provider "aws" {
-  region  = "us-east-1"
-  profile = "root-lab" 
+  region  = var.aws_region
+  profile = var.aws_profile
 }
 
-# 1. Block kubernetes viết riêng độc lập
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
@@ -29,11 +32,10 @@ provider "kubernetes" {
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", "root-lab", "--region", "us-east-1"]
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile, "--region", var.aws_region]
   }
-} # Phải đóng ngoặc cấu hình provider kubernetes ở ĐÂY
+}
 
-# 2. Block helm viết riêng độc lập, bên trong CHỨA block kubernetes con
 provider "helm" {
   kubernetes {
     host                   = module.eks.cluster_endpoint
@@ -42,7 +44,7 @@ provider "helm" {
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", "root-lab", "--region", "us-east-1"]
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile, "--region", var.aws_region]
     }
-  } # Đóng ngoặc của block kubernetes con bên trong helm
-} # Đóng ngoặc chính thức của provider "helm"
+  }
+}
