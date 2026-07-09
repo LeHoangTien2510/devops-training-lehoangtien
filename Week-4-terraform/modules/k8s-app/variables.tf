@@ -79,3 +79,28 @@ variable "node_max_size" {
   type        = number
   default     = 3
 }
+
+# ---------- App (Helm deploy) ----------
+variable "app_image_repository" {
+  description = "Docker image repository cho app"
+  type        = string
+  default     = "nginx"
+}
+
+variable "app_image_tag" {
+  description = "Docker image tag"
+  type        = string
+  default     = "alpine"
+}
+
+variable "app_replicas" {
+  description = "Số lượng pod replica"
+  type        = number
+  default     = 2
+}
+
+variable "app_ingress_host" {
+  description = "Domain host cho Ingress (để trống nếu dùng ALB DNS mặc định)"
+  type        = string
+  default     = ""
+}

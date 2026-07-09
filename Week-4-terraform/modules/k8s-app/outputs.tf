@@ -21,3 +21,13 @@ output "vpc_id" {
   description = "ID của VPC"
   value       = module.vpc.vpc_id
 }
+
+output "helm_release_name" {
+  description = "Tên Helm release của ứng dụng"
+  value       = helm_release.app.name
+}
+
+output "service_endpoint" {
+  description = "Tên Service nội bộ của ứng dụng"
+  value       = "nginx-nodeport-service.default.svc.cluster.local"
+}

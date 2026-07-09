@@ -1,0 +1,31 @@
+# Default values for k8s-app chart
+
+image:
+  repository: nginx
+  tag: alpine
+
+replicas: 2
+
+appName: nginx-test
+appLabel: nginx-test
+
+containerPort: 80
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+service:
+  name: nginx-nodeport-service
+  type: NodePort
+  port: 80
+
+ingress:
+  name: nginx-ingress
+  host: ""
+  scheme: internet-facing
+  targetType: ip

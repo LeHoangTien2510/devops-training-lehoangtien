@@ -19,4 +19,10 @@ module "k8s_app" {
   node_desired_size   = var.node_desired_size
   node_min_size       = var.node_min_size
   node_max_size       = var.node_max_size
+
+  # App Helm deploy
+  app_image_repository = var.app_image_repository
+  app_image_tag        = var.app_image_tag
+  app_replicas         = var.app_replicas
+  app_ingress_host     = var.app_ingress_host
 }

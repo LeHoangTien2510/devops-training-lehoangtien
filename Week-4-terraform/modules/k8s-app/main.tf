@@ -104,3 +104,31 @@ resource "helm_release" "aws_lb_controller" {
     value = module.lb_controller_role.iam_role_arn
   }
 }
+
+# =============================================================================
+# HELM: Deploy ứng dụng lên cụm (Deployment + Service + Ingress)
+# =============================================================================
+resource "helm_release" "app" {
+  name      = "nginx-app"
+  chart     = "${path.module}/chart"
+  namespace = "default"
+
+  depends_on = [helm_release.aws_lb_controller]
+
+  set {
+    name  = "image.repository"
+    value = var.app_image_repository
+  }
+  set {
+    name  = "image.tag"
+    value = var.app_image_tag
+  }
+  set {
+    name  = "replicas"
+    value = var.app_replicas
+  }
+  set {
+    name  = "ingress.host"
+    value = var.app_ingress_host
+  }
+}
