@@ -1,37 +1,24 @@
 # =============================================================================
-# VPC: Mạng ảo cho toàn bộ hạ tầng
+# MODULE COMPUTE: EKS + LB Controller + App
 # =============================================================================
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+# VPC được đọc từ remote_state của tầng network (đã apply trước đó)
 
-  name = var.vpc_name
-  cidr = var.vpc_cidr
-
-  azs             = var.azs
-  private_subnets = var.private_subnets
-  public_subnets  = var.public_subnets
-
-  enable_nat_gateway = true
-  single_nat_gateway = true
-
-  public_subnet_tags = {
-    "kubernetes.io/role/elb" = "1"
-  }
-
-  private_subnet_tags = {
-    "kubernetes.io/role/internal-elb" = "1"
-  }
-
-  tags = {
-    Environment = var.environment
-    Terraform   = "true"
+# =========================================================
+# ĐỌC VPC từ state của tầng network
+# =========================================================
+data "terraform_remote_state" "network" {
+  backend = "s3"
+  config = {
+    bucket  = var.network_state_bucket
+    key     = var.network_state_key
+    region  = var.aws_region
+    profile = var.aws_profile
   }
 }
 
-# =============================================================================
+# =========================================================
 # EKS: Cụm Kubernetes
-# =============================================================================
+# =========================================================
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
@@ -41,8 +28,8 @@ module "eks" {
 
   cluster_endpoint_public_access = true
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id     = data.terraform_remote_state.network.outputs.vpc_id
+  subnet_ids = data.terraform_remote_state.network.outputs.private_subnet_ids
 
   enable_cluster_creator_admin_permissions = true
 
@@ -62,9 +49,9 @@ module "eks" {
   }
 }
 
-# =============================================================================
+# =========================================================
 # IAM ROLE: AWS Load Balancer Controller
-# =============================================================================
+# =========================================================
 module "lb_controller_role" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.0"
@@ -80,9 +67,9 @@ module "lb_controller_role" {
   }
 }
 
-# =============================================================================
-# HELM: Cài AWS Load Balancer Controller vào cụm
-# =============================================================================
+# =========================================================
+# HELM: Cài AWS Load Balancer Controller
+# =========================================================
 resource "helm_release" "aws_lb_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
@@ -93,21 +80,19 @@ resource "helm_release" "aws_lb_controller" {
     name  = "clusterName"
     value = module.eks.cluster_name
   }
-
   set {
     name  = "serviceAccount.name"
     value = "aws-load-balancer-controller"
   }
-
   set {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = module.lb_controller_role.iam_role_arn
   }
 }
 
-# =============================================================================
-# HELM: Deploy ứng dụng lên cụm (Deployment + Service + Ingress)
-# =============================================================================
+# =========================================================
+# HELM: Deploy ứng dụng
+# =========================================================
 resource "helm_release" "app" {
   name      = "nginx-app"
   chart     = "${path.module}/chart"
