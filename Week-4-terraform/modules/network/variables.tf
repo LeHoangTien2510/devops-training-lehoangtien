@@ -12,6 +12,9 @@ variable "vpc_name" {
 }
 
 variable "vpc_cidr"        { type = string }
-variable "azs"             { type = list(string); default = ["us-east-1a", "us-east-1b"] }
+variable "azs" {
+  type    = list(string)
+  default = ["us-east-1a", "us-east-1b"]
+}
 variable "private_subnets" { type = list(string) }
 variable "public_subnets"  { type = list(string) }
