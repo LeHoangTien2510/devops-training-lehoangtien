@@ -7,3 +7,9 @@ datasources:
     url: http://{{ hostvars[groups['monitoring'][0]].ansible_host }}:9090
     isDefault: true
     editable: false
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://{{ hostvars[groups['monitoring'][0]].ansible_host }}:3100
+    editable: false
