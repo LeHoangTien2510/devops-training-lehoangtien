@@ -1,0 +1,37 @@
+---
+# ============================================================
+# Role: loki — Deploy Loki (log aggregation) trên monitoring server
+# Chạy trên: [monitoring]
+# ============================================================
+
+- name: Tạo thư mục cấu hình Loki
+  file:
+    path: "{{ monitoring_base_dir }}/loki"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Deploy Loki config
+  template:
+    src: loki-config.yml.j2
+    dest: "{{ monitoring_base_dir }}/loki/loki-config.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Deploy docker-compose.yml cho Loki
+  template:
+    src: docker-compose.loki.yml.j2
+    dest: "{{ monitoring_base_dir }}/loki/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  notify: restart loki
+
+- name: Khởi động Loki bằng Docker Compose
+  shell:
+    cmd: docker compose up -d
+    chdir: "{{ monitoring_base_dir }}/loki"
+  register: result
+  changed_when: "'up-to-date' not in result.stdout and 'Started' in result.stdout"

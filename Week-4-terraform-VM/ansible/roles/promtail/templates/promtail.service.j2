@@ -1,0 +1,14 @@
+[Unit]
+Description=Promtail - Log agent for Loki
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/promtail \
+  -config.file=/opt/promtail/promtail-config.yml
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

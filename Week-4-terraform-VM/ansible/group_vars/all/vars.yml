@@ -1,0 +1,20 @@
+---
+# ============================================================
+# Group Vars: Biến chung cho toàn bộ monitoring stack
+# ============================================================
+
+# --- Thư mục gốc chứa tất cả stack trên monitoring server ---
+monitoring_base_dir: "/home/{{ ansible_user }}/monitoring"
+
+# --- Phiên bản các thành phần ---
+prometheus_version: "v2.53.0"
+grafana_version: "11.0.0"
+loki_version: "3.1.0"
+node_exporter_version: "1.8.1"
+
+# --- Prometheus retention ---
+prometheus_retention: "7d"
+
+# --- Grafana admin credentials (giá trị thật để trong vault.yml) ---
+grafana_admin_user: "admin"
+grafana_admin_password: "admin"

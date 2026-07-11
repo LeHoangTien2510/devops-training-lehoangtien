@@ -1,0 +1,40 @@
+---
+# ============================================================
+# Role: grafana — Deploy Grafana bằng Docker Compose
+# Chạy trên: [monitoring]
+# ============================================================
+
+- name: Tạo thư mục cấu hình Grafana
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  loop:
+    - "{{ monitoring_base_dir }}/grafana"
+    - "{{ monitoring_base_dir }}/grafana/dashboards"
+
+- name: Deploy datasource (Prometheus) cho Grafana
+  template:
+    src: datasource.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/datasource.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Deploy docker-compose.yml cho Grafana
+  template:
+    src: docker-compose.grafana.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  notify: restart grafana
+
+- name: Khởi động Grafana bằng Docker Compose
+  shell:
+    cmd: docker compose up -d
+    chdir: "{{ monitoring_base_dir }}/grafana"
+  register: result
+  changed_when: "'up-to-date' not in result.stdout and 'Started' in result.stdout"

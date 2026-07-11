@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  # --- Tự giám sát chính Prometheus ---
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # --- Giám sát các target node (Node Exporter) ---
+  - job_name: "node_exporter"
+    static_configs:
+{% for host in groups['targets'] %}
+      - targets: ["{{ hostvars[host].ansible_host }}:9100"]
+        labels:
+          instance: "{{ host }}"
+{% endfor %}

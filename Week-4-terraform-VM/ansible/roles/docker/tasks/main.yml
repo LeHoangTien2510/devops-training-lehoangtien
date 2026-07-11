@@ -1,0 +1,72 @@
+---
+# ============================================================
+# Role: docker — Cài Docker + Docker Compose trên Ubuntu
+# Chạy trên: TẤT CẢ các node
+# ============================================================
+
+- name: Vô hiệu hóa CDROM repository
+  lineinfile:
+    path: /etc/apt/sources.list
+    regexp: '^deb .*cdrom'
+    state: absent
+
+- name: Dọn dẹp Docker repository cũ
+  shell: |
+    rm -f /etc/apt/sources.list.d/docker* /etc/apt/sources.list.d/download_docker* /usr/share/keyrings/docker-archive-keyring.gpg
+  changed_when: false
+
+- name: Chạy apt update
+  apt:
+    update_cache: yes
+
+- name: Cài đặt các gói phụ thuộc
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
+
+- name: Tạo thư mục keyrings
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Thêm Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Thêm Docker APT repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+    update_cache: yes
+
+- name: Cài đặt Docker Engine
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: Thêm user {{ ansible_user }} vào group docker
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
+- name: Khởi động & enable Docker
+  systemd:
+    name: docker
+    state: started
+    enabled: yes

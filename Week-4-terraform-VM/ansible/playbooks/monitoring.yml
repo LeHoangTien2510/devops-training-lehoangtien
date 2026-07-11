@@ -1,0 +1,61 @@
+---
+# ============================================================
+# Playbook: Cài đặt toàn bộ Monitoring Stack lên 2 VM VMware
+# ============================================================
+# VM1 (192.168.183.102) — Monitoring Server: Prometheus + Grafana + Loki
+# VM2 (192.168.183.103) — Target Node:      Node Exporter + Promtail
+#
+# Biến load từ group_vars/all/vars.yml và vault.yml qua vars_files
+# (dùng vars_files thay vì auto-load để tránh bug vault + group_vars)
+# ============================================================
+
+- name: Cài Docker trên tất cả các node
+  hosts: all
+  become: yes
+  roles:
+    - docker
+
+- name: Cài Node Exporter trên target nodes
+  hosts: targets
+  become: yes
+  vars_files:
+    - ../group_vars/all/vars.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - node_exporter
+
+- name: Cài Promtail trên target nodes
+  hosts: targets
+  become: yes
+  vars_files:
+    - ../group_vars/all/vars.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - promtail
+
+- name: Triển khai Prometheus trên monitoring server
+  hosts: monitoring
+  become: yes
+  vars_files:
+    - ../group_vars/all/vars.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - prometheus
+
+- name: Triển khai Grafana trên monitoring server
+  hosts: monitoring
+  become: yes
+  vars_files:
+    - ../group_vars/all/vars.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - grafana
+
+- name: Triển khai Loki trên monitoring server
+  hosts: monitoring
+  become: yes
+  vars_files:
+    - ../group_vars/all/vars.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - loki

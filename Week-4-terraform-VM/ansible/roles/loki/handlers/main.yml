@@ -1,0 +1,5 @@
+---
+- name: restart loki
+  shell:
+    cmd: docker compose restart
+    chdir: "{{ monitoring_base_dir }}/loki"

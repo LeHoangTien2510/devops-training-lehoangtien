@@ -1,0 +1,38 @@
+---
+# ============================================================
+# Role: prometheus — Deploy Prometheus bằng Docker Compose
+# Chạy trên: [monitoring] — monitoring server
+# ============================================================
+
+- name: Tạo thư mục cấu hình Prometheus
+  file:
+    path: "{{ monitoring_base_dir }}/prometheus"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Deploy prometheus.yml từ template
+  template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_base_dir }}/prometheus/prometheus.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  notify: restart prometheus
+
+- name: Deploy docker-compose.yml cho Prometheus
+  template:
+    src: docker-compose.prometheus.yml.j2
+    dest: "{{ monitoring_base_dir }}/prometheus/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  notify: restart prometheus
+
+- name: Khởi động Prometheus stack bằng Docker Compose
+  shell:
+    cmd: docker compose up -d
+    chdir: "{{ monitoring_base_dir }}/prometheus"
+  register: result
+  changed_when: "'up-to-date' not in result.stdout and 'Started' in result.stdout"

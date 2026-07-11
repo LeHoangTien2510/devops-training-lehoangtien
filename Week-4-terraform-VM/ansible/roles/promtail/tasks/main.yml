@@ -1,0 +1,32 @@
+---
+# ============================================================
+# Role: promtail — Cài Promtail agent trên target nodes (Docker)
+# Chạy trên: [targets] — gửi log về Loki server
+# ============================================================
+
+- name: Tạo thư mục cấu hình Promtail
+  file:
+    path: /opt/promtail
+    state: directory
+    mode: "0755"
+
+- name: Deploy Promtail config
+  template:
+    src: promtail-config.yml.j2
+    dest: /opt/promtail/promtail-config.yml
+    mode: "0644"
+  notify: restart promtail
+
+- name: Deploy docker-compose.yml cho Promtail
+  template:
+    src: docker-compose.promtail.yml.j2
+    dest: /opt/promtail/docker-compose.yml
+    mode: "0644"
+  notify: restart promtail
+
+- name: Khởi động Promtail bằng Docker Compose
+  shell:
+    cmd: docker compose up -d
+    chdir: /opt/promtail
+  register: result
+  changed_when: "'up-to-date' not in result.stdout and 'Started' in result.stdout"
