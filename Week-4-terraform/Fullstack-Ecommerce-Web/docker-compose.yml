@@ -1,0 +1,57 @@
+# =============================================================================
+# Docker Compose - Fullstack Ecommerce (dev)
+# =============================================================================
+version: "3.9"
+
+services:
+  # ======================== MySQL ========================
+  mysql:
+    image: mysql:8.0
+    container_name: ecommerce-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: full-stack-ecommerce
+      MYSQL_USER: ecommerceapp
+      MYSQL_PASSWORD: StrongPa55WorD
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./01-starter-files_db-scripts:/docker-entrypoint-initdb.d  # auto init DB
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # ======================== Backend ========================
+  backend:
+    build:
+      context: ./02-backend_spring-boot-rest-api
+      dockerfile: Dockerfile
+    container_name: ecommerce-backend
+    image: lehoangtien2510/ecommerce-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/full-stack-ecommerce
+      SPRING_DATASOURCE_USERNAME: ecommerceapp
+      SPRING_DATASOURCE_PASSWORD: StrongPa55WorD
+      ALLOWED_ORIGINS: http://localhost:4200
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ======================== Frontend ========================
+  frontend:
+    build:
+      context: ./03-frontend_angular-ecommerce
+      dockerfile: Dockerfile
+    container_name: ecommerce-frontend
+    image: lehoangtien2510/demo-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
