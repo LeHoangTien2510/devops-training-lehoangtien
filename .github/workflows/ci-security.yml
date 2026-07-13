@@ -33,7 +33,7 @@ jobs:
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ IMAGE }}:${{ TAG }}
+          image-ref: ${{ env.IMAGE }}:${{ env.TAG }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL
@@ -43,7 +43,7 @@ jobs:
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ IMAGE }}:${{ TAG }}
+          image: ${{ env.IMAGE }}:${{ env.TAG }}
           format: cyclonedx-json
           output-file: sbom.json
 
