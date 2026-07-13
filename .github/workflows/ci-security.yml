@@ -8,6 +8,10 @@ on:
     branches: [main, master, Week-4-progress-4]
   pull_request:
 
+permissions:
+  id-token: write   # ← cần cho Cosign keyless OIDC
+  contents: read
+
 env:
   IMAGE: lehoangtien2510/ecommerce-backend
   TAG: ${{ github.sha }}
