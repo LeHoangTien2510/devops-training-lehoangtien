@@ -5,7 +5,7 @@ name: CI - Supply Chain Security
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, Week-4-progress-4]
   pull_request:
 
 env:
