@@ -4,14 +4,20 @@
 name: CD - Verify & Deploy
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to verify (CI commit SHA)'
+        required: true
+        default: '9fb0800'
   workflow_run:
     workflows: ["CI - Supply Chain Security"]
     types: [completed]
-    branches: [main, master, Week-4-progress-4]
+    branches: [main, master]
 
 env:
   IMAGE: lehoangtien2510/ecommerce-backend
-  TAG: ${{ github.sha }}
+  TAG: ${{ inputs.tag || github.sha }}
 
 jobs:
   verify-and-deploy:
