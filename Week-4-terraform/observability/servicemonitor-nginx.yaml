@@ -1,0 +1,22 @@
+# =============================================================================
+# ServiceMonitor – Để Prometheus scrape metrics từ app nginx
+# Yêu cầu: App phải expose /metrics endpoint (dùng nginx exporter hoặc sidecar)
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nginx-app-monitor
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: nginx-test
+  namespaceSelector:
+    matchNames:
+      - default
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics

@@ -117,3 +117,50 @@ resource "helm_release" "app" {
     value = var.app_ingress_host
   }
 }
+
+# =========================================================
+# HELM: kube-prometheus-stack (cùng default namespace với app)
+# =========================================================
+resource "helm_release" "kube_prometheus" {
+  name       = "kube-prometheus-stack"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  namespace  = "default"
+
+  values = [file("${path.module}/../../observability/kube-prometheus-stack-values.yaml")]
+}
+
+# =========================================================
+# CONFIGMAP: Dashboard preload cho Grafana
+# =========================================================
+resource "kubernetes_config_map_v1" "nginx_dashboard" {
+  metadata {
+    name      = "nginx-dashboard"
+    namespace = "default"
+    labels = {
+      grafana_dashboard = "1"
+    }
+  }
+
+  data = {
+    "nginx-dashboard.json" = file("${path.module}/../../observability/dashboards/nginx-dashboard.json")
+  }
+
+  depends_on = [helm_release.kube_prometheus]
+}
+
+resource "kubernetes_config_map_v1" "k8s_cluster_dashboard" {
+  metadata {
+    name      = "k8s-cluster-dashboard"
+    namespace = "default"
+    labels = {
+      grafana_dashboard = "1"
+    }
+  }
+
+  data = {
+    "k8s-cluster-overview.json" = file("${path.module}/../../observability/dashboards/k8s-cluster-overview.json")
+  }
+
+  depends_on = [helm_release.kube_prometheus]
+}

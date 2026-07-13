@@ -1,0 +1,130 @@
+# =============================================================================
+# kube-prometheus-stack Helm values
+# Stack: Prometheus + Grafana + AlertManager + NodeExporter
+# =============================================================================
+
+# -------- Prometheus --------
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    retentionSize: 10GB
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    # Tự động discover ServiceMonitor
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+
+# -------- Grafana --------
+grafana:
+  enabled: true
+  adminPassword: "admin123" # ĐỔI SAU KHI CÀI
+
+  ingress:
+    enabled: false  # Tắt, dùng chung ingress với app nginx
+  service:
+    type: ClusterIP  # Nội bộ, không cần LB riêng
+
+  # Cấu hình sub-path /grafana
+  "grafana.ini":
+    server:
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+      serve_from_sub_path: true
+
+  # Dashboards mặc định của kube-prometheus-stack (Node, Pod, Cluster...)
+  defaultDashboardsEnabled: true
+
+  # Sidecar tự động load dashboards từ ConfigMap có label
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+
+  # Dashboard 1860: Node Exporter Full (tải từ grafana.com)
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      node-exporter-full:
+        gnetId: 1860
+        revision: 37
+        datasource: Prometheus
+
+  # Cấu hình SMTP (tùy chọn, để gửi alert qua email)
+  # smtp:
+  #   enabled: true
+  #   host: smtp.gmail.com:587
+  #   user: your-email@gmail.com
+  #   password: your-password
+  #   from_address: your-email@gmail.com
+
+# -------- AlertManager --------
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ["alertname"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 3h
+      receiver: "null"
+    receivers:
+      - name: "null"
+
+# -------- PrometheusRule: Pod restart alert --------
+additionalPrometheusRulesMap:
+  pod-restart-alert:
+    groups:
+      - name: pod-restart
+        rules:
+          - alert: PodRestartHigh
+            expr: rate(kube_pod_container_status_restarts_total[10m]) * 600 > 3
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.pod }} (namespace: {{ $labels.namespace }}) restart quá 3 lần trong 10 phút"
+              description: "Pod đã restart {{ $value | humanize }} lần trong 10 phút qua."
+
+# -------- kube-state-metrics --------
+kube-state-metrics:
+  enabled: true
+
+# -------- Node Exporter --------
+prometheus-node-exporter:
+  enabled: true
+
+# -------- ServiceMonitor cho app nginx --------
+# Tạo thêm ServiceMonitor để scrape metrics từ app (nếu có)
+prometheus:
+  serviceAccounts:
+    alertmanager:
+      create: true
+    nodeExporter:
+      create: true
+    prometheus:
+      create: true
+    kubeStateMetrics:
+      create: true

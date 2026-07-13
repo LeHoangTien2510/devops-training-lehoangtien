@@ -9,20 +9,15 @@ metadata:
 spec:
   ingressClassName: alb
   rules:
-    {{- if .Values.ingress.host }}
-    - host: {{ .Values.ingress.host }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.service.name }}
-                port:
-                  number: {{ .Values.service.port }}
-    {{- else }}
     - http:
         paths:
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
           - path: /
             pathType: Prefix
             backend:
@@ -30,4 +25,3 @@ spec:
                 name: {{ .Values.service.name }}
                 port:
                   number: {{ .Values.service.port }}
-    {{- end }}

@@ -14,6 +14,15 @@ spec:
   rules:
     - http:
         paths:
+          # Grafana monitoring (đặt trước vì path cụ thể hơn)
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
+          # Nginx app (catch-all)
           - path: /
             pathType: Prefix
             backend:

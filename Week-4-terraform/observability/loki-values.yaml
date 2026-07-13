@@ -1,0 +1,50 @@
+# =============================================================================
+# Loki Helm values – lightweight log aggregation for k8s (dev mode)
+# =============================================================================
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: false  # Dev: emptyDir, không cần PVC/EBS
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+# Tắt chunks-cache (không cần cho single binary dev)
+chunksCache:
+  enabled: false
+
+# Tắt các thành phần scalable
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# -------- Promtail (log collector) --------
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://loki.monitoring:3100/loki/api/v1/push
