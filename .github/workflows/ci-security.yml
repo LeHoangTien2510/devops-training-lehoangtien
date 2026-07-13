@@ -1,7 +1,7 @@
 # =============================================================================
-# CI Pipeline: Scan → SBOM → Sign
+# CI/CD Pipeline: Scan → SBOM → Sign → Verify
 # =============================================================================
-name: CI - Supply Chain Security
+name: CI/CD - Supply Chain Security
 
 on:
   push:
@@ -78,3 +78,21 @@ jobs:
         run: cosign sign --yes $IMAGE:$TAG
         env:
           COSIGN_EXPERIMENTAL: 1
+
+  # ======================== CD: Verify ========================
+  verify:
+    needs: security                        # ← đợi security job xong mới chạy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Verify image signature
+        run: |
+          cosign verify --certificate-identity-regexp "https://github.com/${{ github.repository }}" \
+                        --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+                        $IMAGE:$TAG \
+          || (echo "❌ IMAGE NOT SIGNED - DEPLOY REJECTED" && exit 1)
+
+      - name: Deploy (placeholder)
+        run: echo "✅ Signature verified - Ready to deploy"

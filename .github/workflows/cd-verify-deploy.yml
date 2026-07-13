@@ -4,10 +4,10 @@
 name: CD - Verify & Deploy
 
 on:
-  push:
-    branches: [Week-4-progress-4]
-    paths-ignore:
-      - '.github/workflows/ci-security.yml'   # tránh chạy song song với CI
+  workflow_run:
+    workflows: ["CI/CD - Supply Chain Security"]
+    types: [completed]
+    branches: [main, master]
 
 env:
   IMAGE: lehoangtien2510/ecommerce-backend
