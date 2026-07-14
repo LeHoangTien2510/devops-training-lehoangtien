@@ -181,7 +181,7 @@ resource "helm_release" "demo_app" {
   wait      = true
   timeout   = 900
 
-  depends_on = [helm_release.aws_lb_controller, helm_release.cert_manager, helm_release.ebs_csi]
+  depends_on = [helm_release.aws_lb_controller, helm_release.cert_manager, helm_release.ebs_csi, helm_release.kube_prometheus]
 
   set {
     name  = "backend.image.tag"
@@ -201,8 +201,7 @@ resource "helm_release" "kube_prometheus" {
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"
   namespace  = "demo-app"
-
-  depends_on = [helm_release.demo_app]
+  create_namespace = true
 
   values = [file("${path.module}/../../observability/kube-prometheus-stack-values.yaml")]
 }
@@ -239,5 +238,5 @@ resource "kubernetes_config_map_v1" "k8s_cluster_dashboard" {
     "k8s-cluster-overview.json" = file("${path.module}/../../observability/dashboards/k8s-cluster-overview.json")
   }
 
-  depends_on = [helm_release.kube_prometheus, ]
+  depends_on = [helm_release.kube_prometheus]
 }
