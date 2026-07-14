@@ -4,7 +4,7 @@ environment = "dev"
 
 cluster_name = "eks-devops-lab"
 
-node_instance_types = ["t3a.large"]
+node_instance_types = ["t3a.medium"]
 node_desired_size   = 2
 node_min_size       = 1
 node_max_size       = 3
