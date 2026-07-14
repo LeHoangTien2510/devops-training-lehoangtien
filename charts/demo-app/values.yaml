@@ -1,0 +1,76 @@
+# =============================================================================
+# Default values for demo-app (3-tier: Angular + Spring Boot + MySQL)
+# ĐÂY LÀ FILE MẪU - COPY thành values.yaml và điền mật khẩu thật
+# =============================================================================
+namespace: demo-app
+environment: dev
+
+mysql:
+  enabled: true
+  image:
+    repository: mysql
+    tag: "8.0"
+  auth:
+    rootPassword: "CHANGE_ME"
+    database: "full-stack-ecommerce"
+    username: "ecommerceapp"
+    password: "CHANGE_ME"
+  service:
+    name: mysql
+    port: 3306
+  persistence:
+    enabled: true
+    storageClass: gp3
+    size: 5Gi
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+backend:
+  enabled: true
+  image:
+    repository: lehoangtien2510/ecommerce-backend
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 2
+  service:
+    name: ecommerce-backend
+    port: 8080
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+  springDatasourceUrl: "jdbc:mysql://mysql:3306/full-stack-ecommerce"
+  allowedOrigins: "*"
+
+frontend:
+  enabled: true
+  image:
+    repository: lehoangtien2510/demo-frontend
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 2
+  service:
+    name: ecommerce-frontend
+    port: 80
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 300m, memory: 256Mi }
+
+ingress:
+  enabled: true
+  name: ecommerce-ingress
+  className: alb
+  scheme: internet-facing
+  targetType: ip
+  tls:
+    enabled: false
+    secretName: ecommerce-tls
+  host: ""
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+
+certManager:
+  enabled: true
+  issuerName: selfsigned-issuer
