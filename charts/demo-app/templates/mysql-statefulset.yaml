@@ -73,6 +73,9 @@ spec:
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql
+            - name: mysql-init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
           resources:
             {{- toYaml .Values.mysql.resources | nindent 12 }}
           livenessProbe:
@@ -87,6 +90,10 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 3
+      volumes:
+        - name: mysql-init
+          configMap:
+            name: mysql-init-scripts
   {{- if .Values.mysql.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:

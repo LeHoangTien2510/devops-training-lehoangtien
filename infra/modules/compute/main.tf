@@ -179,7 +179,7 @@ resource "helm_release" "demo_app" {
   namespace = "demo-app"
   create_namespace = true
   wait      = true
-  timeout   = 600
+  timeout   = 900
 
   depends_on = [helm_release.aws_lb_controller, helm_release.cert_manager, helm_release.ebs_csi]
 
@@ -201,6 +201,8 @@ resource "helm_release" "kube_prometheus" {
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"
   namespace  = "demo-app"
+
+  depends_on = [helm_release.demo_app]
 
   values = [file("${path.module}/../../observability/kube-prometheus-stack-values.yaml")]
 }

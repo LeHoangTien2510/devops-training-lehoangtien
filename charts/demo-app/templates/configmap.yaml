@@ -12,8 +12,8 @@ data:
   application.properties: |
     # ===== MySQL (K8s service name) =====
     spring.datasource.url={{ .Values.backend.springDatasourceUrl }}
-    spring.datasource.username={{ .Values.mysql.auth.username }}
-    spring.datasource.password={{ .Values.mysql.auth.password }}
+    spring.datasource.username=${MYSQL_USER}
+    spring.datasource.password=${MYSQL_PASSWORD}
     spring.datasource.driverClassName=com.mysql.cj.jdbc.Driver
 
     # ===== JPA / Hibernate =====

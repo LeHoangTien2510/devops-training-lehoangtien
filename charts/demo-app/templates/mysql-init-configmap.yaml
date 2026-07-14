@@ -1,0 +1,15 @@
+# =============================================================================
+# ConfigMap: MySQL init SQL scripts
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-scripts
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+data:
+  {{- range $path, $_ := .Files.Glob "sql/*.sql" }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+  {{- end }}
