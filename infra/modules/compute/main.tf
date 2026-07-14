@@ -50,6 +50,43 @@ module "eks" {
 }
 
 # =========================================================
+# IAM ROLE: EBS CSI Driver (cho PVC/EBS volumes)
+# =========================================================
+module "ebs_csi_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name                              = "eks-ebs-csi-driver"
+  attach_ebs_csi_policy                  = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
+    }
+  }
+}
+
+# =========================================================
+# HELM: Cài EBS CSI Driver (cho PVC bind EBS volumes)
+# =========================================================
+resource "helm_release" "ebs_csi" {
+  name       = "aws-ebs-csi-driver"
+  repository = "https://kubernetes-sigs.github.io/aws-ebs-csi-driver"
+  chart      = "aws-ebs-csi-driver"
+  namespace  = "kube-system"
+
+  set {
+    name  = "controller.serviceAccount.name"
+    value = "ebs-csi-controller-sa"
+  }
+  set {
+    name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = module.ebs_csi_role.iam_role_arn
+  }
+}
+
+# =========================================================
 # IAM ROLE: AWS Load Balancer Controller
 # =========================================================
 module "lb_controller_role" {
@@ -144,7 +181,7 @@ resource "helm_release" "demo_app" {
   wait      = true
   timeout   = 600
 
-  depends_on = [helm_release.aws_lb_controller, helm_release.cert_manager]
+  depends_on = [helm_release.aws_lb_controller, helm_release.cert_manager, helm_release.ebs_csi]
 
   set {
     name  = "backend.image.tag"

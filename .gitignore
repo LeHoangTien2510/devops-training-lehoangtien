@@ -1,1 +1,47 @@
+# ===== Binary =====
 bin/
+
+# ===== Terraform =====
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfvars
+!*.tfvars.example
+override.tf
+
+# ===== Helm secrets =====
+charts/demo-app/values.yaml
+
+# ===== Environment & Secrets =====
+.env
+.env.*
+*.pem
+*.key
+kubeconfig
+.kube/
+credentials
+secrets.*
+
+# ===== Build artifacts =====
+node_modules/
+target/
+*.class
+*.jar
+*.war
+dist/
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== Logs & temp =====
+*.log
+*.retry
+*.backup

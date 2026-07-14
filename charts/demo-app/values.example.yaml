@@ -1,22 +1,20 @@
 # =============================================================================
 # Default values for demo-app (3-tier: Angular + Spring Boot + MySQL)
+# ĐÂY LÀ FILE MẪU - COPY thành values.yaml và điền mật khẩu thật
 # =============================================================================
-
-# -------- Global --------
 namespace: demo-app
 environment: dev
 
-# -------- MySQL (StatefulSet) --------
 mysql:
   enabled: true
   image:
     repository: mysql
     tag: "8.0"
   auth:
-    rootPassword: "rootpassword"
+    rootPassword: "CHANGE_ME"
     database: "full-stack-ecommerce"
     username: "ecommerceapp"
-    password: "StrongPa55WorD"
+    password: "CHANGE_ME"
   service:
     name: mysql
     port: 3306
@@ -25,14 +23,9 @@ mysql:
     storageClass: gp2
     size: 5Gi
   resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
+    requests: { cpu: 200m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
 
-# -------- Backend (Spring Boot) --------
 backend:
   enabled: true
   image:
@@ -44,17 +37,11 @@ backend:
     name: ecommerce-backend
     port: 8080
   resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
-  # Kết nối DB sẽ lấy từ configmap
+    requests: { cpu: 200m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
   springDatasourceUrl: "jdbc:mysql://mysql:3306/full-stack-ecommerce"
   allowedOrigins: "*"
 
-# -------- Frontend (Angular) --------
 frontend:
   enabled: true
   image:
@@ -66,33 +53,24 @@ frontend:
     name: ecommerce-frontend
     port: 80
   resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 256Mi
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 300m, memory: 256Mi }
 
-# -------- Ingress (ALB) --------
 ingress:
   enabled: true
   name: ecommerce-ingress
   className: alb
   scheme: internet-facing
   targetType: ip
-  # TLS (bật khi có domain)
   tls:
     enabled: false
     secretName: ecommerce-tls
-  # Host (để trống nếu dùng ALB DNS)
   host: ""
 
-# -------- ServiceMonitor (Prometheus) --------
 serviceMonitor:
   enabled: true
   interval: 30s
 
-# -------- cert-manager (ClusterIssuer) --------
 certManager:
   enabled: true
   issuerName: selfsigned-issuer
