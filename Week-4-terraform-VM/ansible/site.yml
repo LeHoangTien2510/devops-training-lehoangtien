@@ -1,0 +1,16 @@
+---
+# ============================================================
+# Playbook: Lab 2 — Ansible Role Nginx
+# ============================================================
+# Triển khai nginx + cấu hình SSL từ template lên 2 host VMware
+#
+# Chạy:
+#   ansible-playbook -i inventory site.yml
+#   ansible-playbook -i inventory site.yml --check    (dry-run / idempotent test)
+# ============================================================
+
+- name: Cài đặt & cấu hình nginx với SSL
+  hosts: nginx
+  become: yes
+  roles:
+    - nginx

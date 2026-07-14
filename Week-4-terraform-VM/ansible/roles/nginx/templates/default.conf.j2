@@ -1,0 +1,39 @@
+# ============================================================
+# Nginx Site Config — Template (Jinja2)
+# Host: {{ ansible_host }}
+# ============================================================
+
+# Redirect HTTP -> HTTPS
+server {
+    listen 80;
+    server_name {{ ansible_host }};
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name {{ ansible_host }};
+
+    # SSL certificates (tự tạo bởi Ansible)
+    ssl_certificate     /etc/nginx/ssl/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx-selfsigned.key;
+
+    # SSL params
+    include /etc/nginx/snippets/ssl-params.conf;
+
+    # Document root
+    root /var/www/html;
+    index index.html index.htm;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "OK - {{ ansible_host }}\n";
+        add_header Content-Type text/plain;
+    }
+}

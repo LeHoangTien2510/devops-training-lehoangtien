@@ -1,0 +1,67 @@
+---
+# ============================================================
+# Role: nginx — Cài nginx + cấu hình từ template + tự tạo cert
+# ============================================================
+
+- name: Cài đặt nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Đảm bảo thư mục SSL tồn tại
+  file:
+    path: /etc/nginx/ssl
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Tạo self-signed SSL certificate
+  command: >
+    openssl req -x509 -nodes -days 365
+    -newkey rsa:2048
+    -keyout /etc/nginx/ssl/nginx-selfsigned.key
+    -out /etc/nginx/ssl/nginx-selfsigned.crt
+    -subj "/C=VN/ST=HCM/L=HCM/O=Lab/OU=DevOps/CN={{ ansible_host }}"
+  args:
+    creates: /etc/nginx/ssl/nginx-selfsigned.crt
+
+- name: Tạo tham số Diffie-Hellman (tăng cường bảo mật)
+  command: >
+    openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
+  args:
+    creates: /etc/nginx/ssl/dhparam.pem
+
+- name: Triển khai cấu hình nginx từ template
+  template:
+    src: default.conf.j2
+    dest: /etc/nginx/sites-available/default
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart nginx
+
+- name: Triển khai cấu hình SSL params từ template
+  template:
+    src: ssl-params.conf.j2
+    dest: /etc/nginx/snippets/ssl-params.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart nginx
+
+- name: Tạo trang index.html từ template
+  template:
+    src: index.html.j2
+    dest: /var/www/html/index.html
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Đảm bảo nginx được khởi động và enable
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+  when: not ansible_check_mode

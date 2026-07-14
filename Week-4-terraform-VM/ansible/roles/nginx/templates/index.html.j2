@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Nginx Lab — {{ inventory_hostname }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding-top: 80px; }
+        h1 { color: #2c3e50; }
+        .info { color: #7f8c8d; font-size: 14px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Nginx đang chạy trên <strong>{{ inventory_hostname }}</strong></h1>
+    <p>IP: {{ ansible_host }}</p>
+    <p>OS: {{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+    <div class="info">Cấu hình từ Ansible template — Lab 2: Ansible Role Nginx</div>
+</body>
+</html>
