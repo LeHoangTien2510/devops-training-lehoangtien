@@ -1,0 +1,44 @@
+# =============================================================================
+# ArgoCD Application – demo-app (3-tier: Angular + Spring Boot + MySQL)
+# ArgoCD sẽ tự động sync Helm chart từ Git repo này
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io  # Xóa resources khi xóa Application
+spec:
+  project: default
+
+  source:
+    # Git repo chứa Helm chart
+    repoURL: https://github.com/lehoangtien2510/devops-training-lehoangtien
+    targetRevision: main
+    path: charts/demo-app
+
+    helm:
+      # Override values từ Git (có thể override thêm ở đây)
+      values: |
+        backend:
+          image:
+            tag: latest
+        frontend:
+          image:
+            tag: latest
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  syncPolicy:
+    # Tự động tạo namespace nếu chưa có
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+
+    # Auto-sync: tự động sync khi phát hiện thay đổi trong Git
+    automated:
+      prune: true      # Xóa resources không còn trong Git
+      selfHeal: true   # Tự sửa nếu ai đó sửa trực tiếp trên cluster

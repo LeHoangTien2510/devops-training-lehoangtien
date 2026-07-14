@@ -1,0 +1,33 @@
+# =============================================================================
+# ConfigMap: Backend application.properties
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-backend-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+data:
+  application.properties: |
+    # ===== MySQL (K8s service name) =====
+    spring.datasource.url={{ .Values.backend.springDatasourceUrl }}
+    spring.datasource.username={{ .Values.mysql.auth.username }}
+    spring.datasource.password={{ .Values.mysql.auth.password }}
+    spring.datasource.driverClassName=com.mysql.cj.jdbc.Driver
+
+    # ===== JPA / Hibernate =====
+    spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
+    spring.jpa.hibernate.ddl-auto=none
+    spring.jpa.show-sql=true
+    spring.jpa.properties.hibernate.format_sql=true
+
+    # ===== REST API base path =====
+    spring.data.rest.base-path=/api
+
+    # ===== CORS =====
+    allowed.origins={{ .Values.backend.allowedOrigins }}
+
+    # ===== Okta OAuth2 =====
+    okta.oauth2.client-id=0oab0lzwjoN1Rjsar5d7
+    okta.oauth2.issuer=https://dev-82108115.okta.com/oauth2/default

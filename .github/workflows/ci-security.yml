@@ -1,5 +1,5 @@
 # =============================================================================
-# CI/CD Pipeline: Scan → SBOM → Sign → Verify
+# CI/CD Pipeline: Scan → SBOM → Sign → Verify (Backend + Frontend)
 # =============================================================================
 name: CI/CD - Supply Chain Security
 
@@ -13,86 +13,158 @@ permissions:
   contents: read
 
 env:
-  IMAGE: lehoangtien2510/ecommerce-backend
+  BACKEND_IMAGE: lehoangtien2510/ecommerce-backend
+  FRONTEND_IMAGE: lehoangtien2510/demo-frontend
   TAG: ${{ github.sha }}
 
 jobs:
-  security:
+  # ======================== BACKEND ========================
+  security-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- 1. Login Docker Hub ----------
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # ---------- 2. Build image ----------
-      - name: Build Docker image
-        run: docker build -f Week-4-terraform/Fullstack-Ecommerce-Web/02-backend_spring-boot-rest-api/Dockerfile -t $IMAGE:$TAG Week-4-terraform/Fullstack-Ecommerce-Web/02-backend_spring-boot-rest-api/
+      - name: Build Backend image
+        run: docker build -f src/02-backend_spring-boot-rest-api/Dockerfile -t $BACKEND_IMAGE:$TAG src/02-backend_spring-boot-rest-api/
 
-      # ---------- 3. Trivy scan (table format → hiện CVE ra log) ----------
-      - name: Trivy Vulnerability Scan
+      - name: Trivy Scan Backend
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.IMAGE }}:${{ env.TAG }}
+          image-ref: ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           format: table
-          output: trivy-results.txt
+          output: trivy-backend.txt
           severity: CRITICAL,HIGH
           exit-code: 0
 
-      - name: Show scan results
-        run: cat trivy-results.txt
+      - name: Show Backend scan
+        run: cat trivy-backend.txt
 
-      - name: Upload Trivy scan results
+      - name: Upload Backend scan
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-scan-results
-          path: trivy-results.txt
+          name: trivy-backend
+          path: trivy-backend.txt
 
-      # ---------- 4. Tạo SBOM bằng Syft ----------
-      - name: Generate SBOM
+      - name: SBOM Backend
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.IMAGE }}:${{ env.TAG }}
+          image: ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           format: cyclonedx-json
-          output-file: sbom.json
+          output-file: sbom-backend.json
 
-      - name: Upload SBOM artifact
+      - name: Upload SBOM Backend
         uses: actions/upload-artifact@v4
         with:
-          name: sbom
-          path: sbom.json
+          name: sbom-backend
+          path: sbom-backend.json
 
-      # ---------- 5. Push image (phải push trước khi sign) ----------
-      - name: Push image
-        run: docker push $IMAGE:$TAG
+      - name: Push Backend
+        run: docker push $BACKEND_IMAGE:$TAG
 
-      # ---------- 6. Cosign keyless sign (GitHub OIDC) ----------
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Sign image with Cosign (keyless)
-        run: cosign sign --yes $IMAGE:$TAG
+      - name: Sign Backend (keyless)
+        run: cosign sign --yes $BACKEND_IMAGE:$TAG
         env:
           COSIGN_EXPERIMENTAL: 1
 
-  # ======================== CD: Verify ========================
-  verify:
-    needs: security                        # ← đợi security job xong mới chạy
+  # ======================== FRONTEND ========================
+  security-frontend:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Frontend image
+        run: docker build -f src/03-frontend_angular-ecommerce/Dockerfile -t $FRONTEND_IMAGE:$TAG src/03-frontend_angular-ecommerce/
+
+      - name: Trivy Scan Frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ env.TAG }}
+          format: table
+          output: trivy-frontend.txt
+          severity: CRITICAL,HIGH
+          exit-code: 0
+
+      - name: Show Frontend scan
+        run: cat trivy-frontend.txt
+
+      - name: Upload Frontend scan
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-frontend
+          path: trivy-frontend.txt
+
+      - name: SBOM Frontend
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.FRONTEND_IMAGE }}:${{ env.TAG }}
+          format: cyclonedx-json
+          output-file: sbom-frontend.json
+
+      - name: Upload SBOM Frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-frontend
+          path: sbom-frontend.json
+
+      - name: Push Frontend
+        run: docker push $FRONTEND_IMAGE:$TAG
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Verify image signature
+      - name: Sign Frontend (keyless)
+        run: cosign sign --yes $FRONTEND_IMAGE:$TAG
+        env:
+          COSIGN_EXPERIMENTAL: 1
+
+  # ======================== CD: Verify & Deploy ========================
+  verify-deploy:
+    needs: [security-backend, security-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Verify Backend signature
         run: |
           cosign verify --certificate-identity-regexp "https://github.com/${{ github.repository }}" \
                         --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-                        $IMAGE:$TAG \
-          || (echo "❌ IMAGE NOT SIGNED - DEPLOY REJECTED" && exit 1)
+                        $BACKEND_IMAGE:$TAG \
+          || (echo "❌ BACKEND NOT SIGNED - DEPLOY REJECTED" && exit 1)
 
-      - name: Deploy (placeholder)
-        run: echo "✅ Signature verified - Ready to deploy"
+      - name: Verify Frontend signature
+        run: |
+          cosign verify --certificate-identity-regexp "https://github.com/${{ github.repository }}" \
+                        --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+                        $FRONTEND_IMAGE:$TAG \
+          || (echo "❌ FRONTEND NOT SIGNED - DEPLOY REJECTED" && exit 1)
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install demo-app ./charts/demo-app \
+            --namespace default \
+            --set backend.image.tag=$TAG \
+            --set frontend.image.tag=$TAG \
+            --wait --timeout 5m

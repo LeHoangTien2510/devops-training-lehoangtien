@@ -1,0 +1,18 @@
+aws_region  = "us-east-1"
+aws_profile = "root-lab"
+environment = "dev"
+
+cluster_name = "eks-devops-lab"
+
+node_instance_types = ["t3a.large"]
+node_desired_size   = 2
+node_min_size       = 1
+node_max_size       = 3
+
+app_image_repository = "nginx"
+app_image_tag        = "alpine"
+app_replicas         = 2
+app_ingress_host     = ""
+
+demo_app_backend_tag  = "latest"
+demo_app_frontend_tag = "latest"

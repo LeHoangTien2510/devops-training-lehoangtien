@@ -1,0 +1,25 @@
+# =============================================================================
+# ServiceMonitor - Prometheus scrape backend metrics
+# =============================================================================
+{{- if and .Values.serviceMonitor.enabled .Values.backend.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ecommerce-backend-monitor
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: ecommerce-backend
+      app.kubernetes.io/component: backend
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.namespace }}
+  endpoints:
+    - port: http
+      interval: {{ .Values.serviceMonitor.interval }}
+      path: /actuator/prometheus
+{{- end }}

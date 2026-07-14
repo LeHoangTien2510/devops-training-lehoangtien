@@ -1,0 +1,13 @@
+# =============================================================================
+# ClusterIssuer: Self-signed (cho cert-manager TLS)
+# =============================================================================
+{{- if .Values.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.certManager.issuerName }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}
