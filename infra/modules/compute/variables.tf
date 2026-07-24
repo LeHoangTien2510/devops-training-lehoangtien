@@ -56,12 +56,4 @@ variable "network_state_key" {
   type        = string
 }
 
-# ---------- Demo App (Helm chart tại charts/demo-app) ----------
-variable "demo_app_backend_tag" {
-  type    = string
-  default = "latest"
-}
-variable "demo_app_frontend_tag" {
-  type    = string
-  default = "latest"
-}
+

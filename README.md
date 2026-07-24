@@ -108,7 +108,7 @@
 
 ### Yêu cầu
 
-- AWS CLI + profile `root-lab`
+- AWS CLI + profile `root-lab-2`
 - Terraform >= 1.5
 - kubectl + Helm 3
 - Docker Hub account
@@ -134,7 +134,7 @@ terraform init && terraform apply -auto-approve
 ### 2. Kết nối cluster
 
 ```bash
-aws eks update-kubeconfig --region us-east-1 --name eks-devops-lab --profile root-lab
+aws eks update-kubeconfig --region us-east-1 --name eks-devops-lab --profile root-lab-2
 kubectl get pods -n demo-app
 ```
 

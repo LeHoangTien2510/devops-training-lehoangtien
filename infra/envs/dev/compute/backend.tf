@@ -1,10 +1,10 @@
 terraform {
   backend "s3" {
-    bucket         = "terraform-state-devops-lab-tien"
+    bucket         = "terraform-state-devops-lab-tien-v2"
     key            = "envs/dev/compute/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "terraform-locks"
     encrypt        = true
-    profile        = "root-lab"
+    profile        = "root-lab-2"
   }
 }

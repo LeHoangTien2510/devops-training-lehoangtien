@@ -170,73 +170,45 @@ resource "helm_release" "argocd" {
 }
 
 # =========================================================
-# HELM: Deploy demo-app (3-tier: Frontend + Backend + MySQL)
-# Namespace + Secret + toàn bộ resource do Helm chart tự quản lý
+# HELM: kube-prometheus-stack (TẠM TẮT - bật lại sau khi test xong)
 # =========================================================
-resource "helm_release" "demo_app" {
-  name      = "demo-app"
-  chart     = "${path.module}/../../../charts/demo-app"
-  namespace = "demo-app"
-  create_namespace = true
-  wait      = true
-  timeout   = 900
-
-  depends_on = [helm_release.aws_lb_controller, helm_release.cert_manager, helm_release.ebs_csi, helm_release.kube_prometheus]
-
-  set {
-    name  = "backend.image.tag"
-    value = var.demo_app_backend_tag
-  }
-  set {
-    name  = "frontend.image.tag"
-    value = var.demo_app_frontend_tag
-  }
-}
+# resource "helm_release" "kube_prometheus" {
+#   name       = "kube-prometheus-stack"
+#   repository = "https://prometheus-community.github.io/helm-charts"
+#   chart      = "kube-prometheus-stack"
+#   namespace  = "demo-app"
+#   create_namespace = true
+#
+#   values = [file("${path.module}/../../observability/kube-prometheus-stack-values.yaml")]
+# }
 
 # =========================================================
-# HELM: kube-prometheus-stack (cùng default namespace với app)
+# CONFIGMAP: Dashboard preload cho Grafana (TẠM TẮT)
 # =========================================================
-resource "helm_release" "kube_prometheus" {
-  name       = "kube-prometheus-stack"
-  repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "kube-prometheus-stack"
-  namespace  = "demo-app"
-  create_namespace = true
-
-  values = [file("${path.module}/../../observability/kube-prometheus-stack-values.yaml")]
-}
-
-# =========================================================
-# CONFIGMAP: Dashboard preload cho Grafana
-# =========================================================
-resource "kubernetes_config_map_v1" "nginx_dashboard" {
-  metadata {
-    name      = "nginx-dashboard"
-    namespace = "demo-app"
-    labels = {
-      grafana_dashboard = "1"
-    }
-  }
-
-  data = {
-    "nginx-dashboard.json" = file("${path.module}/../../observability/dashboards/nginx-dashboard.json")
-  }
-
-  depends_on = [helm_release.kube_prometheus]
-}
-
-resource "kubernetes_config_map_v1" "k8s_cluster_dashboard" {
-  metadata {
-    name      = "k8s-cluster-dashboard"
-    namespace = "demo-app"
-    labels = {
-      grafana_dashboard = "1"
-    }
-  }
-
-  data = {
-    "k8s-cluster-overview.json" = file("${path.module}/../../observability/dashboards/k8s-cluster-overview.json")
-  }
-
-  depends_on = [helm_release.kube_prometheus]
-}
+# resource "kubernetes_config_map_v1" "nginx_dashboard" {
+#   metadata {
+#     name      = "nginx-dashboard"
+#     namespace = "demo-app"
+#     labels = {
+#       grafana_dashboard = "1"
+#     }
+#   }
+#   data = {
+#     "nginx-dashboard.json" = file("${path.module}/../../observability/dashboards/nginx-dashboard.json")
+#   }
+#   depends_on = [helm_release.kube_prometheus]
+# }
+#
+# resource "kubernetes_config_map_v1" "k8s_cluster_dashboard" {
+#   metadata {
+#     name      = "k8s-cluster-dashboard"
+#     namespace = "demo-app"
+#     labels = {
+#       grafana_dashboard = "1"
+#     }
+#   }
+#   data = {
+#     "k8s-cluster-overview.json" = file("${path.module}/../../observability/dashboards/k8s-cluster-overview.json")
+#   }
+#   depends_on = [helm_release.kube_prometheus]
+# }

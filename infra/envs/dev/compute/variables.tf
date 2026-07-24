@@ -14,5 +14,4 @@ variable "app_image_tag"        { type = string }
 variable "app_replicas"         { type = number }
 variable "app_ingress_host"     { type = string }
 
-variable "demo_app_backend_tag"  { type = string }
-variable "demo_app_frontend_tag" { type = string }
+

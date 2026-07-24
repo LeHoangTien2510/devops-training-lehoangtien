@@ -17,10 +17,7 @@ module "compute" {
   app_replicas         = var.app_replicas
   app_ingress_host     = var.app_ingress_host
 
-  demo_app_backend_tag  = var.demo_app_backend_tag
-  demo_app_frontend_tag = var.demo_app_frontend_tag
-
   # REMOTE STATE: Đọc VPC từ tầng network
-  network_state_bucket = "terraform-state-devops-lab-tien"
+  network_state_bucket = "terraform-state-devops-lab-tien-v2"
   network_state_key    = "envs/stg/network/terraform.tfstate"
 }

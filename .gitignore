@@ -10,8 +10,8 @@ bin/
 .terraform.lock.hcl
 override.tf
 
-# ===== Helm secrets =====
-charts/demo-app/values.yaml
+# ===== Secrets (không push password) =====
+charts/demo-app/manual/apply-mysql-secret.yaml
 
 # ===== Environment & Secrets =====
 .env

@@ -15,12 +15,12 @@ terraform {
 
 provider "aws" {
   region  = "us-east-1"
-  profile = "root-lab"
+  profile = "root-lab-2"
 }
 
 # S3 bucket lưu state
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "terraform-state-devops-lab-tien"
+  bucket = "terraform-state-devops-lab-tien-v2"
   #       ^^^ TÊN PHẢI UNIQUE TOÀN CẦU, đổi theo tên bạn
 }
 

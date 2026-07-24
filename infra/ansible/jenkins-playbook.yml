@@ -1,0 +1,225 @@
+---
+# =============================================================================
+# Ansible Playbook: Cài đặt Jenkins CI/CD Server trên EC2
+# =============================================================================
+# Yêu cầu:
+#   - EC2 đã được Terraform tạo và đã có Docker
+#   - File Dockerfile.jenkins đã được copy lên server
+#   - Chạy: ansible-playbook -i inventory.ini jenkins-playbook.yml
+# =============================================================================
+- name: Provision Jenkins CI/CD Server
+  hosts: jenkins
+  become: yes
+  vars:
+    jenkins_container_name: jenkins
+    jenkins_image_name: jenkins-cicd:latest
+    jenkins_host_port: 8080
+    jenkins_jnlp_port: 50000
+    jenkins_home: /var/jenkins_home
+
+  tasks:
+    # ============================================================
+    # 0. CÀI DOCKER (nếu chưa có)
+    # ============================================================
+    - name: Kiểm tra Docker đã cài chưa
+      command: docker --version
+      register: docker_installed
+      changed_when: false
+      ignore_errors: true
+
+    - name: Cài đặt Docker (nếu chưa có)
+      block:
+        - name: Update apt cache
+          apt:
+            update_cache: yes
+            cache_valid_time: 3600
+
+        - name: Cài đặt Docker qua script chính thức
+          shell: curl -fsSL https://get.docker.com | bash
+          args:
+            creates: /usr/bin/docker
+
+        - name: Khởi động Docker
+          systemd:
+            name: docker
+            state: started
+            enabled: yes
+
+        - name: Thêm user ubuntu vào docker group
+          user:
+            name: ubuntu
+            groups: docker
+            append: yes
+
+        - name: Cài Docker Compose plugin (docker compose)
+          apt:
+            name: docker-compose-plugin
+            state: present
+
+        - name: Cài Docker Compose standalone (docker-compose)
+          get_url:
+            url: https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+            dest: /usr/local/bin/docker-compose
+            mode: "0755"
+      when: docker_installed.rc != 0
+
+    - name: Hiển thị phiên bản Docker
+      debug:
+        msg: "✅ Docker: {{ docker_installed.stdout if docker_installed.rc == 0 else '(vừa cài xong)' }}"
+
+    # ============================================================
+    # 1. KIỂM TRA DOCKER + LẤY GID THẬT TỪ HOST
+    # ============================================================
+    - name: Kiểm tra Docker đã cài đặt
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Hiển thị phiên bản Docker
+      debug:
+        msg: "✅ Docker: {{ docker_version.stdout }}"
+
+    - name: Kiểm tra Docker daemon đang chạy
+      command: docker info
+      register: docker_info
+      changed_when: false
+      ignore_errors: true
+
+    - name: Khởi động Docker nếu chưa chạy
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      when: docker_info.rc != 0
+
+    # 🔑 Lấy GID thật của group "docker" trên host
+    # Ví dụ: $ getent group docker → docker:x:995:ubuntu → GID=995
+    - name: Lấy GID thật của docker group trên host
+      shell: "getent group docker | cut -d: -f3"
+      register: docker_gid_result
+      changed_when: false
+
+    - name: Lưu GID vào biến
+      set_fact:
+        docker_host_gid: "{{ docker_gid_result.stdout | trim }}"
+
+    - name: Hiển thị GID docker group
+      debug:
+        msg: "🔑 Docker group GID trên host = {{ docker_host_gid }}"
+
+    # ============================================================
+    # 2. TẠO THƯ MỤC JENKINS HOME
+    # ============================================================
+    - name: Tạo thư mục Jenkins home
+      file:
+        path: "{{ jenkins_home }}"
+        state: directory
+        owner: "1000"
+        group: "1000"
+        mode: "0755"
+
+    # ============================================================
+    # 3. BUILD JENKINS IMAGE (CUSTOM)
+    # ============================================================
+    - name: Copy Dockerfile.jenkins lên server
+      copy:
+        src: ../../Dockerfile.jenkins
+        dest: /tmp/Dockerfile.jenkins
+        mode: "0644"
+
+    - name: Build Jenkins Docker image
+      command: >
+        docker build
+        --build-arg DOCKER_GID={{ docker_host_gid }}
+        -t {{ jenkins_image_name }}
+        -f /tmp/Dockerfile.jenkins
+        /tmp
+      register: build_result
+      changed_when: "'Successfully tagged' in build_result.stdout"
+
+    # ============================================================
+    # 4. CHẠY JENKINS CONTAINER
+    # ============================================================
+    - name: Dừng container Jenkins cũ (nếu có)
+      command: docker rm -f {{ jenkins_container_name }}
+      ignore_errors: true
+      changed_when: false
+
+    - name: Chạy Jenkins container
+      command: >
+        docker run -d
+        --name {{ jenkins_container_name }}
+        --restart unless-stopped
+        --group-add {{ docker_host_gid }}
+        -p {{ jenkins_host_port }}:8080
+        -p {{ jenkins_jnlp_port }}:50000
+        -v {{ jenkins_home }}:/var/jenkins_home
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -e JAVA_OPTS="-Djenkins.install.runSetupWizard=true"
+        {{ jenkins_image_name }}
+      register: container_result
+
+    - name: Đợi Jenkins khởi động (30s)
+      wait_for:
+        port: 8080
+        delay: 30
+        timeout: 120
+
+    # ============================================================
+    # 5. LẤY INITIAL ADMIN PASSWORD
+    # ============================================================
+    - name: Lấy Jenkins initial admin password
+      command: cat {{ jenkins_home }}/secrets/initialAdminPassword
+      register: admin_password
+      changed_when: false
+      ignore_errors: true
+
+    - name: Hiển thị thông tin truy cập Jenkins
+      debug:
+        msg:
+          - "============================================"
+          - "✅ JENKINS ĐÃ SẴN SÀNG!"
+          - "URL:        http://{{ ansible_default_ipv4.address }}:8080"
+          - "Password:   {{ admin_password.stdout | default('(đợi Jenkins khởi động xong)') }}"
+          - "SSH:        ssh ubuntu@{{ ansible_default_ipv4.address }}"
+          - "============================================"
+
+    # ============================================================
+    # 6. CÀI THÊM TOOLS TRÊN HOST (tuỳ chọn)
+    # ============================================================
+    - name: Cài Git + unzip
+      apt:
+        name:
+          - git
+          - unzip
+        state: present
+        update_cache: yes
+
+    - name: Cài AWS CLI v2
+      get_url:
+        url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: /tmp/awscliv2.zip
+      register: awscli_download
+      ignore_errors: true
+
+    - name: Giải nén AWS CLI
+      unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp
+        remote_src: yes
+      when: awscli_download is success
+
+    - name: Cài đặt AWS CLI
+      command: /tmp/aws/install --update
+      when: awscli_download is success
+      ignore_errors: true
+
+    - name: Kiểm tra AWS CLI
+      command: aws --version
+      register: aws_version
+      changed_when: false
+      ignore_errors: true
+
+    - name: Hiển thị phiên bản AWS CLI
+      debug:
+        msg: "AWS CLI: {{ aws_version.stdout | default('(chưa cài)') }}"

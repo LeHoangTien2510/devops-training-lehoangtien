@@ -30,7 +30,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: demo-app
 
   syncPolicy:
     # Tự động tạo namespace nếu chưa có

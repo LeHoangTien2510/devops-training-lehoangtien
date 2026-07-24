@@ -1,0 +1,41 @@
+# =============================================================================
+# Custom Jenkins Image – có sẵn Docker CLI + Trivy
+# Build:  docker build -t jenkins-cicd:latest -f Dockerfile.jenkins .
+# =============================================================================
+FROM jenkins/jenkins:lts
+
+USER root
+
+# ---------- Cài Docker CLI (để giao tiếp với Docker daemon trên host) ----------
+RUN apt-get update && apt-get install -y \
+    ca-certificates curl gnupg lsb-release \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ---------- Cài Trivy (scan image security) ----------
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+# ---------- Cài thêm tool hữu ích ----------
+RUN apt-get update && apt-get install -y \
+    jq \
+    unzip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ---------- Tạo Docker group với cùng GID như host (quan trọng!) ----------
+# Khi chạy container, truyền --group-add <DOCKER_GID> để Jenkins user dùng được docker sock
+ARG DOCKER_GID=999
+RUN groupadd -g ${DOCKER_GID} docker-host || true \
+    && usermod -aG docker-host jenkins
+
+USER jenkins
+
+# ---------- Cài sẵn Jenkins plugins ----------
+RUN jenkins-plugin-cli --plugins \
+    workflow-aggregator \
+    git \
+    docker-workflow \
+    credentials-binding \
+    blueocean
