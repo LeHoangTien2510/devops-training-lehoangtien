@@ -9,6 +9,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "demo-app.mysqlLabels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"  # Wave 0: Database trước
 spec:
   type: ClusterIP
   clusterIP: None  # Headless service cho StatefulSet
@@ -28,6 +30,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "demo-app.mysqlLabels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   serviceName: {{ .Values.mysql.service.name }}
   replicas: 1

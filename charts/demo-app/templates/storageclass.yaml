@@ -7,6 +7,8 @@ metadata:
   name: gp3
   labels:
     {{- include "demo-app.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 provisioner: ebs.csi.aws.com
 volumeBindingMode: WaitForFirstConsumer
 parameters:

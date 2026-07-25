@@ -1,0 +1,29 @@
+# =============================================================================
+# App-of-Apps Root: DEV Environment
+# Apply 1 file này → tự động tạo tất cả app con trong thư mục applications/dev/
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/lehoangtien2510/devops-training-lehoangtien
+    targetRevision: Week-5-CICD
+    path: argocd/applications/dev          # ← Trỏ vào thư mục chứa app con
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd                       # App con được tạo trong namespace argocd
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

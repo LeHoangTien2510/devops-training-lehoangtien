@@ -9,6 +9,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "demo-app.backendLabels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: {{ .Values.backend.replicaCount }}
   selector:
@@ -73,6 +75,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "demo-app.backendLabels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   type: ClusterIP
   selector:

@@ -1,0 +1,107 @@
+# =============================================================================
+# PreSync Hook: Backup MySQL trước khi deploy
+# Chỉ chạy khi MySQL StatefulSet đã tồn tại (từ lần deploy trước)
+# =============================================================================
+{{- if .Values.mysql.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: presync-db-backup
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync          # ← Chạy TRƯỚC sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation  # Xóa job cũ trước khi tạo mới
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: backup
+          image: mysql:{{ .Values.mysql.image.tag }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "📦 [PreSync] Backup MySQL..."
+              TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+              FILE="/tmp/backup-${TIMESTAMP}.sql"
+              mysqldump -h {{ .Values.mysql.service.name }} \
+                -u {{ .Values.mysql.auth.username }} \
+                -p$MYSQL_PASSWORD \
+                {{ .Values.mysql.auth.database }} \
+                > "$FILE" 2>/dev/null && echo "✅ Backup saved: $FILE ($(wc -c < $FILE) bytes)" || echo "⚠️ DB chưa có, bỏ qua backup"
+              # TODO Production: aws s3 cp "$FILE" s3://my-backups/mysql/
+          env:
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-password
+{{- end }}
+
+---
+# =============================================================================
+# PostSync Hook: Health check Backend sau khi deploy
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postsync-health-check
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync         # ← Chạy SAU sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: healthcheck
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "🏥 [PostSync] Health check Backend..."
+              for i in 1 2 3 4 5; do
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://{{ .Values.backend.service.name }}:{{ .Values.backend.service.port }}/actuator/health 2>/dev/null || echo "000")
+                if [ "$STATUS" = "200" ]; then
+                  echo "✅ Backend healthy (HTTP $STATUS)"
+                  exit 0
+                fi
+                echo "⏳ Attempt $i/5: HTTP $STATUS, retrying..."
+                sleep 3
+              done
+              echo "❌ Backend not healthy after 5 attempts"
+              exit 1
+{{- end }}
+
+---
+# =============================================================================
+# SyncFail Hook: Thông báo khi sync thất bại
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: syncfail-notify
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: SyncFail         # ← Chạy khi sync LỖI
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: notify
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "🚨 [SyncFail] Deployment thất bại!"
+              echo "Env: {{ .Values.environment }}"
+              echo "App: {{ .Values.namespace }}"
+              echo "Kiểm tra ArgoCD UI để xem lỗi chi tiết."
+              # TODO: Gửi Slack/Teams webhook ở đây
+{{- end }}
