@@ -20,13 +20,6 @@ spec:
     helm:
       valueFiles:
         - values.yaml
-      values: |
-        backend:
-          image:
-            tag: latest
-        frontend:
-          image:
-            tag: latest
 
   destination:
     server: https://kubernetes.default.svc
