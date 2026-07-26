@@ -20,7 +20,7 @@ provider "aws" {
 
 # S3 bucket lưu state
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "terraform-state-devops-lab-tien-v2"
+  bucket = "terraform-state-devops-lab-tien-v3"
   #       ^^^ TÊN PHẢI UNIQUE TOÀN CẦU, đổi theo tên bạn
 }
 

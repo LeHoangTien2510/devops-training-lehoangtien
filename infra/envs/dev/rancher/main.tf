@@ -3,7 +3,7 @@
 # =============================================================================
 terraform {
   backend "s3" {
-    bucket  = "terraform-state-devops-lab-tien-v2"
+    bucket  = "terraform-state-devops-lab-tien-v3"
     key     = "envs/dev/rancher/terraform.tfstate"
     region  = "us-east-1"
     profile = "root-lab-2"
@@ -18,7 +18,7 @@ provider "aws" {
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
-    bucket  = "terraform-state-devops-lab-tien-v2"
+    bucket  = "terraform-state-devops-lab-tien-v3"
     key     = "envs/dev/network/terraform.tfstate"
     region  = var.aws_region
     profile = var.aws_profile
