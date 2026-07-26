@@ -74,7 +74,6 @@ spec:
               done
               echo "❌ Backend not healthy after 5 attempts"
               exit 1
-{{- end }}
 
 ---
 # =============================================================================
@@ -104,4 +103,3 @@ spec:
               echo "App: {{ .Values.namespace }}"
               echo "Kiểm tra ArgoCD UI để xem lỗi chi tiết."
               # TODO: Gửi Slack/Teams webhook ở đây
-{{- end }}
