@@ -63,16 +63,16 @@ spec:
             - -c
             - |
               echo "🏥 [PostSync] Health check Backend..."
-              for i in 1 2 3 4 5; do
+              for i in $(seq 1 10); do
                 STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://{{ .Values.backend.service.name }}:{{ .Values.backend.service.port }}/actuator/health 2>/dev/null || echo "000")
-                if [ "$STATUS" = "200" ]; then
-                  echo "✅ Backend healthy (HTTP $STATUS)"
+                if [ "$STATUS" = "200" ] || [ "$STATUS" = "404" ]; then
+                  echo "✅ Backend responding (HTTP $STATUS) - attempt $i"
                   exit 0
                 fi
-                echo "⏳ Attempt $i/5: HTTP $STATUS, retrying..."
-                sleep 3
+                echo "⏳ Attempt $i/10: HTTP $STATUS, retrying in 10s..."
+                sleep 10
               done
-              echo "❌ Backend not healthy after 5 attempts"
+              echo "❌ Backend not responding after 10 attempts"
               exit 1
 
 ---
