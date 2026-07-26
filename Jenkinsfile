@@ -176,7 +176,7 @@ pipeline {
                         git diff --cached --quiet || git commit -m "[CI] Update image tag to ${BUILD_NUMBER}"
 
                         # Push về main/master
-                        git push origin HEAD:main 2>/dev/null || git push origin HEAD:master 2>/dev/null || {
+                        git push origin HEAD:Week-5-CICD 2>/dev/null || {
                             echo "## CẢNH BÁO: Push Git thất bại (kiểm tra GitHub token và quyền repo)"
                         }
                     '''
