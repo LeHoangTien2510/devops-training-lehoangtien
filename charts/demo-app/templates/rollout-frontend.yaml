@@ -1,0 +1,42 @@
+# =============================================================================
+# Argo Rollouts: Blue-Green deployment cho Frontend
+# Tạo Green song song Blue → manual promote → switch traffic
+# =============================================================================
+{{- if .Values.frontend.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Values.frontend.service.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "demo-app.frontendLabels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: ecommerce-frontend
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        app: ecommerce-frontend
+        app.kubernetes.io/component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+  strategy:
+    blueGreen:
+      activeService: {{ .Values.frontend.service.name }}
+      previewService: {{ .Values.frontend.service.name }}-preview
+      autoPromotionEnabled: false
+{{- end }}

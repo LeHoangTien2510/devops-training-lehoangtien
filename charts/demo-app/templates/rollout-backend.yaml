@@ -1,0 +1,65 @@
+# =============================================================================
+# Argo Rollouts: Canary deployment cho Backend
+# 10% → pause 60s → 50% → pause 60s → 100%
+# Không cần Prometheus (time-based)
+# =============================================================================
+{{- if .Values.backend.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Values.backend.service.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "demo-app.backendLabels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      app: ecommerce-backend
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        app: ecommerce-backend
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.port }}
+              protocol: TCP
+          env:
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-user
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-password
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: ecommerce-backend-config
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 60s }
+        - setWeight: 50
+        - pause: { duration: 60s }
+        - setWeight: 100
+{{- end }}
