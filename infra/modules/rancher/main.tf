@@ -24,7 +24,7 @@ resource "aws_security_group" "rancher" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["14.232.69.20/32"]
+    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32"]
     description = "SSH"
   }
 
@@ -40,7 +40,7 @@ resource "aws_security_group" "rancher" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["14.232.69.20/32"]
+    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32"]
     description = "Rancher HTTPS"
   }
 

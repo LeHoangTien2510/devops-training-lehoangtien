@@ -1,185 +1,199 @@
 # DevOps Training — Le Hoang Tien
 
-## 🏗️ Kiến trúc hệ thống
+> Full-stack DevOps project: EKS + CI/CD (Jenkins) + GitOps (ArgoCD)
+
+---
+
+## Architecture
 
 ```
-                              INTERNET
-                                 │
-                                 ▼
-                    ┌─────────────────────────┐
-                    │     AWS ALB (Ingress)    │
-                    │  internet-facing, TLS    │
-                    │  cert-manager (selfsigned)│
-                    └─────┬──────┬──────┬──────┘
-                          │      │      │
-                    /     │  /api│      │ /grafana
-                         ▼      ▼      ▼
-              ┌──────────┐ ┌────────┐ ┌──────────┐
-              │ Frontend │ │Backend │ │ Grafana  │
-              │ Angular  │ │Spring  │ │(monitoring│
-              │ nginx:80 │ │Boot:8080│ │   :80)   │
-              │  (2 pods)│ │(2 pods)│ │          │
-              └──────────┘ └───┬────┘ └──────────┘
-                               │ JDBC
-                               │ jdbc:mysql://mysql:3306
-                               ▼
-                    ┌─────────────────────┐
-                    │   MySQL StatefulSet │
-                    │   mysql:3306        │
-                    │   1 pod + PVC 5Gi   │
-                    │   gp3 (EBS CSI)     │
-                    └────────┬────────────┘
-                             │
-                    ┌────────▼────────────┐
-                    │   AWS EBS Volume    │
-                    │   5Gi gp3 SSD       │
-                    └─────────────────────┘
-
-┌──────────────────────────────────────────────────────┐
-│                  AWS EKS Cluster                     │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐ │
-│  │ cert-manager│  │    ArgoCD    │  │  Prometheus  │ │
-│  │ (TLS certs) │  │ (GitOps CD)  │  │  + AlertMgr  │ │
-│  └─────────────┘  └──────────────┘  └─────────────┘ │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │  EBS CSI Driver  │  AWS LB Controller          │ │
-│  └─────────────────────────────────────────────────┘ │
-│  2 node t3a.large (us-east-1)                       │
-└──────────────────────────────────────────────────────┘
+                          AWS Cloud (us-east-1)
+ ┌──────────┐  ┌──────────┐
+ │ Jenkins  │  │ Rancher  │  << SG: IP whitelist only
+ │ EC2 :8080│  │ EC2 :443 │
+ └────┬─────┘  └──────────┘
+      │ CI/CD Pipeline: Build → Push → ArgoCD sync
+      ▼
+ ┌─────────────────────────────────────────────┐
+ │              EKS Cluster                     │
+ │  ┌─────────┐  ┌──────────────────────────┐  │
+ │  │ ArgoCD  │  │  namespace: demo-app      │  │
+ │  │ App-of- │  │                            │  │
+ │  │ Apps    │  │  ALB Ingress                │  │
+ │  └─────────┘  │    ↓                        │  │
+ │               │  Frontend (Angular): 2 pods  │  │
+ │               │    ↓                        │  │
+ │               │  Backend (Spring): 2 pods    │  │
+ │               │    ↓                        │  │
+ │               │  MySQL 8.0 (StatefulSet)     │  │
+ │               │  PVC 5Gi gp3                 │  │
+ │               └──────────────────────────────┘  │
+ │  2 node c7i-flex.large                           │
+ └──────────────────────────────────────────────────┘
 ```
 
-## 🧱 Tech Stack
+## CI/CD Pipeline
 
-| Layer | Công nghệ |
-|-------|-----------|
-| **Frontend** | Angular + Nginx |
-| **Backend** | Spring Boot (Java 17) |
-| **Database** | MySQL 8.0 (StatefulSet) |
-| **Container** | Docker, Docker Hub |
-| **Orchestration** | Kubernetes (AWS EKS 1.31) |
-| **Ingress** | AWS ALB Ingress Controller |
-| **TLS** | cert-manager + ClusterIssuer (self-signed) |
-| **Storage** | EBS CSI Driver + gp3 StorageClass + PVC 5Gi |
-| **Monitoring** | kube-prometheus-stack (Grafana + Prometheus + AlertManager) |
-| **GitOps CD** | ArgoCD |
-| **CI** | GitHub Actions (build + Trivy scan + SBOM + Cosign sign) |
-| **CD** | GitHub Actions (verify signature + Helm deploy) |
-| **IaC** | Terraform (S3 backend + DynamoDB lock) |
-| **Secrets** | Kubernetes Secret (mysql-secret) |
+```
+Developer push code → GitHub (Week-5-CICD)
+    │
+    ▼
+Jenkins Pipeline:
+  1. Verify Tools
+  2. Checkout Code
+  3. Docker Login
+  4. Lint (Backend + Frontend)
+  5. Test (Backend + Frontend)
+  6. Build & Push (Backend + Frontend → Docker Hub)
+  7. Trivy Security Scan
+  8. Update GitOps (sed tag → git push)
+    │
+    ▼
+ArgoCD:
+  Detect values.yaml change → Sync Wave 0→1→2 → App updated
+```
 
-## 📁 Cấu trúc dự án
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Angular + Nginx |
+| Backend | Spring Boot |
+| Database | MySQL 8.0 (StatefulSet + PVC) |
+| Container | Docker, Docker Hub |
+| Orchestration | AWS EKS 1.31 |
+| Ingress | AWS ALB Ingress Controller |
+| Storage | EBS CSI Driver + gp3 |
+| GitOps CD | ArgoCD (App-of-Apps, Sync Wave, Hooks) |
+| CI | Jenkins (self-hosted EC2) |
+| IaC | Terraform (S3 backend, multi-env) |
+| Config Mgmt | Ansible |
+| Security | Trivy, SG IP whitelist, IAM least privilege |
+
+## Project Structure
 
 ```
 .
-├── charts/demo-app/              # Helm chart 3-tier app
-│   ├── Chart.yaml
-│   ├── values.example.yaml       # File mẫu (an toàn commit)
-│   ├── values.yaml               # Secret thật (gitignored)
-│   ├── sql/                      # Scripts init MySQL
-│   └── templates/                # K8s manifests
-│       ├── storageclass.yaml     # gp3 StorageClass
-│       ├── secret.yaml           # MySQL credentials
-│       ├── configmap.yaml        # Backend config
-│       ├── mysql-statefulset.yaml
-│       ├── backend.yaml
-│       ├── frontend.yaml
-│       ├── ingress.yaml
-│       ├── servicemonitor.yaml
-│       └── clusterissuer.yaml
-├── infra/                        # Terraform IaC
-│   ├── modules/
-│   │   ├── network/              # VPC, subnets, NAT, IGW
-│   │   └── compute/              # EKS, IAM, Helm releases
-│   ├── envs/
-│   │   ├── dev/                  # Dev environment
-│   │   └── stg/                  # Staging environment
-│   ├── bootstrap-backend/        # S3 + DynamoDB state
-│   └── observability/            # Monitoring configs
-├── src/                          # Source code
-│   ├── 02-backend_spring-boot-rest-api/
-│   ├── 03-frontend_angular-ecommerce/
-│   └── 01-starter-files_db-scripts/
-├── argocd/                       # ArgoCD config
-├── .github/workflows/            # CI/CD pipelines
-└── README.md
+├── charts/demo-app/           # Helm chart 3-tier app
+│   ├── values.yaml            # Jenkins auto-updates tag
+│   ├── templates/             # K8s manifests + hooks
+│   └── manual/                # Secret templates
+├── infra/
+│   ├── modules/               # Terraform modules
+│   │   ├── network/           # VPC + subnets
+│   │   ├── compute/           # EKS + ArgoCD
+│   │   ├── jenkins/           # EC2 Jenkins
+│   │   └── rancher/           # EC2 Rancher
+│   ├── envs/dev/              # Dev environment
+│   ├── envs/stg/              # Staging environment
+│   ├── ansible/               # Ansible playbooks
+│   └── bootstrap-backend/     # S3 + DynamoDB
+├── argocd/                    # ArgoCD App-of-Apps
+│   ├── app-of-apps/dev-root.yaml
+│   └── applications/dev/demo-app.yaml
+├── src/                       # Source code
+├── Jenkinsfile                # CI/CD pipeline
+└── Dockerfile.jenkins         # Custom Jenkins image
 ```
 
-## 🚀 Deploy
+## How to Deploy
 
-### Yêu cầu
+### Prerequisites
 
 - AWS CLI + profile `root-lab-2`
-- Terraform >= 1.5
-- kubectl + Helm 3
+- Terraform >= 1.5, kubectl + Helm 3, Ansible
 - Docker Hub account
+- GitHub Token (scope: `repo`)
+- AWS Key Pair
 
-### 1. Terraform (IaC)
+### 1. Infrastructure
 
 ```bash
-# Bootstrap (chỉ 1 lần)
+# Bootstrap (S3 + DynamoDB)
 cd infra/bootstrap-backend
 terraform init && terraform apply -auto-approve
 
 # Network (VPC)
 cd ../envs/dev/network
-cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply -auto-approve
 
-# Compute (EKS + toàn bộ stack)
+# Compute (EKS + ArgoCD) — ~15-20 min
 cd ../compute
-cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply -auto-approve
-```
 
-### 2. Kết nối cluster
-
-```bash
 aws eks update-kubeconfig --region us-east-1 --name eks-devops-lab --profile root-lab-2
-kubectl get pods -n demo-app
+kubectl get nodes
 ```
 
-### 3. Truy cập
-
-| Dịch vụ | URL |
-|---------|-----|
-| App | `http://<ALB-DNS>/` |
-| Backend API | `http://<ALB-DNS>/api/products` |
-| Grafana | `http://<ALB-DNS>/grafana` (admin / admin123) |
-| Prometheus | `kubectl port-forward -n demo-app svc/kube-prometheus-stack-prometheus 9090:9090` |
-| ArgoCD | `kubectl port-forward -n argocd svc/argocd-server 8080:443` |
+### 2. Kubernetes Setup
 
 ```bash
-# Lấy ALB DNS
-kubectl get ingress -n demo-app ecommerce-ingress
+kubectl create ns demo-app
+kubectl -n demo-app create secret generic mysql-secret \
+  --from-literal=mysql-root-password=STRONG_PASS \
+  --from-literal=mysql-database=full-stack-ecommerce \
+  --from-literal=mysql-user=ecommerceapp \
+  --from-literal=mysql-password=STRONG_PASS
+
+kubectl apply -f argocd/app-of-apps/dev-root.yaml
+kubectl get pods -n demo-app -w
 ```
 
-## 🔐 Secrets
+### 3. Jenkins EC2
 
-- `charts/demo-app/values.yaml` — gitignored, chứa MySQL passwords
-- `*.tfvars` — gitignored, chứa AWS config
-- `mysql-secret` (K8s Secret) — tự động tạo bởi Helm chart
-- Backend đọc password từ `${MYSQL_PASSWORD}` env → Secret
+```bash
+cd infra/envs/dev/jenkins
+terraform init && terraform apply -auto-approve
 
-## 📊 Monitoring
-
-- **Grafana**: dashboards preloaded (Node Exporter, K8s Cluster, Nginx)
-- **Prometheus**: scrape metrics mỗi 30s
-- **AlertManager**: 
-  - `PodRestartHigh`: pod restart > 3 lần/10 phút → warning
-
-## 🔄 CI/CD
-
-```
-Git Push (main) → GitHub Actions:
-  1. Build Backend + Frontend Docker images
-  2. Trivy scan (CRITICAL, HIGH)
-  3. SBOM (Syft CycloneDX)
-  4. Push Docker Hub
-  5. Cosign keyless sign (OIDC)
-  6. Verify signatures
-  7. Helm deploy to EKS
+cd ../../../ansible
+./run.sh jenkins-playbook.yml
+# → http://<JENKINS_IP>:8080
 ```
 
-## 🗂️ Runbook
+### 4. Jenkins Credentials
 
-Xem [RUNBOOK.md](RUNBOOK.md) để biết cách xử lý khi production gặp sự cố.
+| ID | Kind |
+|----|------|
+| `dockerhub-credentials` | Username with password |
+| `github-token` | Secret text |
+
+### 5. Test CI/CD
+
+```bash
+git add -A && git commit -m "Test" && git push origin Week-5-CICD
+# Jenkins builds → pushes tag → ArgoCD auto-syncs
+```
+
+## Access
+
+| Service | How to Access |
+|---------|---------------|
+| Demo App | `kubectl get ingress -n demo-app` → ALB DNS |
+| ArgoCD | `kubectl port-forward -n argocd svc/argocd-server 8443:443` → https://localhost:8443 |
+| ArgoCD Password | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d` |
+| Jenkins | http://<JENKINS_EIP>:8080 |
+| Jenkins Password | `cat /var/jenkins_home/secrets/initialAdminPassword` (SSH vào EC2) |
+| Rancher | https://<RANCHER_EIP>.sslip.io |
+
+## Security
+
+| Measure | Detail |
+|---------|--------|
+| SG IP Whitelist | Jenkins + Rancher restricted to trusted IP only |
+| Image Scanning | Trivy HIGH + CRITICAL in every build |
+| Secret Mgmt | MySQL password in K8s Secret, never in Git |
+| GitOps Audit | All changes via Git history |
+
+> ⚠️ **Lesson:** Jenkins port 8080 open to internet → hacked within minutes → EC2 used for DDoS. **Fix:** IP whitelist in Security Group.
+
+## ArgoCD Features
+
+| Feature | Description |
+|---------|-------------|
+| App-of-Apps | 1 root app → auto-create all child apps |
+| Sync Wave | MySQL (Wave 0) → Backend (Wave 1) → Frontend+Ingress (Wave 2) |
+| PreSync Hook | Backup MySQL before deploy |
+| PostSync Hook | Health check after deploy |
+| SyncFail Hook | Alert on failure |
+| Prune | Git-deleted → auto-deleted on cluster |
+| Self-Heal | Manual changes → auto-reverted |
