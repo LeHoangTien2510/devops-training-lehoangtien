@@ -12,6 +12,14 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(
+            name: 'DEPLOY_ENV',
+            choices: ['dev', 'dev+stg', 'dev+stg+prd'],
+            description: 'Deploy to which environments?'
+        )
+    }
+
     environment {
         DOCKER_REGISTRY = 'lehoangtien2510'
         GITOPS_REPO     = 'github.com/lehoangtien2510/devops-training-lehoangtien'
@@ -156,15 +164,14 @@ pipeline {
             }
         }
 
-        // ==================== GITOPS ====================
-        stage('Update GitOps') {
+        // ==================== GITOPS DEV (auto) ====================
+        stage('Update GitOps DEV') {
             steps {
                 withCredentials([string(
                     credentialsId: 'github-token',
                     variable: 'GITHUB_TOKEN'
                 )]) {
                     sh '''
-                        # Cập nhật tag trong values.yaml
                         sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_NUMBER}/}" charts/demo-app/values.yaml
                         sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_NUMBER}/}" charts/demo-app/values.yaml
 
@@ -173,12 +180,62 @@ pipeline {
                         git remote set-url origin https://${GITHUB_TOKEN}@${GITOPS_REPO}
 
                         git add charts/demo-app/values.yaml
-                        git diff --cached --quiet || git commit -m "[CI] Update image tag to ${BUILD_NUMBER}"
+                        git diff --cached --quiet || git commit -m "[CI] DEV: Update image tag to ${BUILD_NUMBER}"
+                        git push origin HEAD:Week-5-CICD 2>/dev/null || echo "## WARNING: Git push failed"
+                    '''
+                }
+            }
+        }
 
-                        # Push về main/master
-                        git push origin HEAD:Week-5-CICD 2>/dev/null || {
-                            echo "## CẢNH BÁO: Push Git thất bại (kiểm tra GitHub token và quyền repo)"
-                        }
+        // ==================== PROMOTE TO STG ====================
+        stage('Promote to STG') {
+            when {
+                expression { params.DEPLOY_ENV == 'dev+stg' || params.DEPLOY_ENV == 'dev+stg+prd' }
+            }
+            steps {
+                withCredentials([string(
+                    credentialsId: 'github-token',
+                    variable: 'GITHUB_TOKEN'
+                )]) {
+                    sh '''
+                        BUILD_TAG=$(grep -A5 "^backend:" charts/demo-app/values.yaml | grep "tag:" | head -1 | awk "{print \$2}")
+                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-stg.yaml
+                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-stg.yaml
+
+                        git config user.email "jenkins@devopsedu.vn"
+                        git config user.name "Jenkins CI"
+                        git remote set-url origin https://${GITHUB_TOKEN}@${GITOPS_REPO}
+
+                        git add charts/demo-app/values-stg.yaml
+                        git commit -m "[CI] STG: Promote image tag to ${BUILD_TAG}"
+                        git push origin HEAD:Week-5-CICD 2>/dev/null || echo "## WARNING: Git push failed"
+                    '''
+                }
+            }
+        }
+
+        // ==================== PROMOTE TO PRD ====================
+        stage('Promote to PRD') {
+            when {
+                expression { params.DEPLOY_ENV == 'dev+stg+prd' }
+            }
+            steps {
+                withCredentials([string(
+                    credentialsId: 'github-token',
+                    variable: 'GITHUB_TOKEN'
+                )]) {
+                    sh '''
+                        BUILD_TAG=$(grep -A5 "^backend:" charts/demo-app/values.yaml | grep "tag:" | head -1 | awk "{print \$2}")
+                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-prd.yaml
+                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-prd.yaml
+
+                        git config user.email "jenkins@devopsedu.vn"
+                        git config user.name "Jenkins CI"
+                        git remote set-url origin https://${GITHUB_TOKEN}@${GITOPS_REPO}
+
+                        git add charts/demo-app/values-prd.yaml
+                        git commit -m "[CI] PRD: Promote image tag to ${BUILD_TAG}"
+                        git push origin HEAD:Week-5-CICD 2>/dev/null || echo "## WARNING: Git push failed"
                     '''
                 }
             }

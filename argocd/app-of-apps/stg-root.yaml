@@ -1,0 +1,28 @@
+# =============================================================================
+# App-of-Apps Root: STAGING Environment
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: stg-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/lehoangtien2510/devops-training-lehoangtien
+    targetRevision: Week-5-CICD
+    path: argocd/applications/stg
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,34 @@
+# =============================================================================
+# ArgoCD Application – demo-app (STAGING)
+# Manual promote: Jenkins job đổi tag trong values-stg.yaml
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app-stg
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/lehoangtien2510/devops-training-lehoangtien
+    targetRevision: Week-5-CICD
+    path: charts/demo-app
+
+    helm:
+      valueFiles:
+        - values-stg.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-app-stg
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    automated:
+      prune: true
+      selfHeal: true
