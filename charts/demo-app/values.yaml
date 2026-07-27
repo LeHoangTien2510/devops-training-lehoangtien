@@ -34,7 +34,7 @@ backend:
   enabled: true
   image:
     repository: lehoangtien2510/ecommerce-backend
-    tag: 1
+    tag: 2
     pullPolicy: Always
   replicaCount: 2
   service:
@@ -50,7 +50,7 @@ frontend:
   enabled: true
   image:
     repository: lehoangtien2510/ecommerce-frontend
-    tag: 1
+    tag: 2
     pullPolicy: Always
   replicaCount: 2
   service:
