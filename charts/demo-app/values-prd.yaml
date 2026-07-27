@@ -21,8 +21,8 @@ mysql:
     storageClass: gp3
     size: 10Gi
   resources:
-    requests: { cpu: 500m, memory: 1Gi }
-    limits:   { cpu: 1, memory: 2Gi }
+    requests: { cpu: 200m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
 
 backend:
   enabled: true
@@ -30,13 +30,13 @@ backend:
     repository: lehoangtien2510/ecommerce-backend
     tag: latest
     pullPolicy: Always
-  replicaCount: 3
+  replicaCount: 2
   service:
     name: ecommerce-backend
     port: 8080
   resources:
-    requests: { cpu: 500m, memory: 1Gi }
-    limits:   { cpu: 1, memory: 2Gi }
+    requests: { cpu: 200m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
   springDatasourceUrl: "jdbc:mysql://mysql:3306/full-stack-ecommerce"
   allowedOrigins: "*"
 
@@ -46,7 +46,7 @@ frontend:
     repository: lehoangtien2510/ecommerce-frontend
     tag: latest
     pullPolicy: Always
-  replicaCount: 3
+  replicaCount: 2
   service:
     name: ecommerce-frontend
     port: 80
