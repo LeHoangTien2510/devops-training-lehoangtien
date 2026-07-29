@@ -22,7 +22,7 @@ variable "public_subnet_id" {
 
 variable "instance_type" {
   type    = string
-  default = "t3.large"     # Rancher khuyến nghị 4GB RAM
+  default = "t3.large" # Rancher khuyến nghị 4GB RAM
 }
 
 variable "root_volume_size" {

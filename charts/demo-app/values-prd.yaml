@@ -72,3 +72,17 @@ serviceMonitor:
 certManager:
   enabled: false
   issuerName: selfsigned-issuer
+
+# =============================================================================
+# Vault Integration – External Secrets Operator
+# =============================================================================
+vault:
+  enabled: false
+  address: "http://vault.vault.svc.cluster.local:8200"
+  path: "secret"
+  authMount: "kubernetes"
+  role: "demo-app"
+  serviceAccount: "demo-app"
+  refreshInterval: "1h"
+  secretPath:
+    mysql: "secret/demo-app/mysql"

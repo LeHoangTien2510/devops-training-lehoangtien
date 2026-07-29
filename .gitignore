@@ -23,6 +23,10 @@ kubeconfig
 credentials
 secrets.*
 
+# ===== Vault =====
+infra/vault/vault-credentials.json
+infra/vault/vault.env
+
 # ===== Build artifacts =====
 node_modules/
 target/

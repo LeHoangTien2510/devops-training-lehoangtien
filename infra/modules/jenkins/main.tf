@@ -133,12 +133,12 @@ resource "aws_iam_instance_profile" "jenkins" {
 # EC2 Instance – Jenkins Server
 # =========================================================
 resource "aws_instance" "jenkins" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  subnet_id              = var.public_subnet_id
-  vpc_security_group_ids = [aws_security_group.jenkins.id]
-  iam_instance_profile   = aws_iam_instance_profile.jenkins.name
-  key_name               = var.key_name
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  subnet_id                   = var.public_subnet_id
+  vpc_security_group_ids      = [aws_security_group.jenkins.id]
+  iam_instance_profile        = aws_iam_instance_profile.jenkins.name
+  key_name                    = var.key_name
   associate_public_ip_address = true
 
   root_block_device {

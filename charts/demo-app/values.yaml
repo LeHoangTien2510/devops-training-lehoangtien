@@ -10,7 +10,9 @@ mysql:
   image:
     repository: mysql
     tag: "8.0"
-  # ⚠️ KHÔNG để password ở đây! Tạo Secret thủ công:
+  # 🔐 Secrets được quản lý bởi Vault + External Secrets Operator
+  # Khi vault.enabled=true, ESO tự động tạo K8s Secret từ Vault
+  # Khi vault.enabled=false, tạo secret thủ công:
   #    kubectl create secret generic mysql-secret -n demo-app \
   #      --from-literal=mysql-root-password=... \
   #      --from-literal=mysql-database=full-stack-ecommerce \
@@ -34,7 +36,7 @@ backend:
   enabled: true
   image:
     repository: lehoangtien2510/ecommerce-backend
-    tag: 2
+    tag: latest
     pullPolicy: Always
   replicaCount: 2
   service:
@@ -50,7 +52,7 @@ frontend:
   enabled: true
   image:
     repository: lehoangtien2510/ecommerce-frontend
-    tag: 2
+    tag: latest
     pullPolicy: Always
   replicaCount: 2
   service:
@@ -78,3 +80,21 @@ serviceMonitor:
 certManager:
   enabled: false
   issuerName: selfsigned-issuer
+
+# =============================================================================
+# Vault Integration – External Secrets Operator
+# =============================================================================
+# ESO tự động sync secrets từ Vault → Kubernetes Secrets.
+# Không cần tạo secret thủ công nữa!
+#
+# Yêu cầu: Vault + ESO đã được cài (chạy infra/vault/install-vault.sh)
+vault:
+  enabled: false
+  address: "http://vault.vault.svc.cluster.local:8200"
+  path: "secret"
+  authMount: "kubernetes"
+  role: "demo-app"
+  serviceAccount: "demo-app"
+  refreshInterval: "1h"
+  secretPath:
+    mysql: "secret/demo-app/mysql"
