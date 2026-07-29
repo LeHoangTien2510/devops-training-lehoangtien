@@ -170,6 +170,60 @@ resource "helm_release" "argocd" {
 }
 
 # =========================================================
+# HELM: Cài Argo Rollouts (Blue-Green + Canary)
+# =========================================================
+resource "helm_release" "argo_rollouts" {
+  name             = "argo-rollouts"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-rollouts"
+  namespace        = "argo-rollouts"
+  create_namespace = true
+  wait             = true
+  timeout          = 300
+
+  depends_on = [helm_release.aws_lb_controller]
+}
+
+# =========================================================
+# HELM: Cài HashiCorp Vault (Secret Management)
+# =========================================================
+resource "helm_release" "vault" {
+  name             = "vault"
+  repository       = "https://helm.releases.hashicorp.com"
+  chart            = "vault"
+  namespace        = "vault"
+  create_namespace = true
+  wait             = true
+  timeout          = 600
+
+  depends_on = [helm_release.aws_lb_controller]
+
+  values = [
+    file("${path.module}/../vault/vault-values.yaml")
+  ]
+}
+
+# =========================================================
+# HELM: Cài External Secrets Operator (cầu nối Vault → K8s)
+# =========================================================
+resource "helm_release" "external_secrets" {
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  namespace        = "external-secrets"
+  create_namespace = true
+  wait             = true
+  timeout          = 300
+
+  depends_on = [helm_release.aws_lb_controller]
+
+  set {
+    name  = "installCRDs"
+    value = "true"
+  }
+}
+
+# =========================================================
 # HELM: kube-prometheus-stack (TẠM TẮT - bật lại sau khi test xong)
 # =========================================================
 # resource "helm_release" "kube_prometheus" {

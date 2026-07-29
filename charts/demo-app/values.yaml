@@ -89,7 +89,7 @@ certManager:
 #
 # Yêu cầu: Vault + ESO đã được cài (chạy infra/vault/install-vault.sh)
 vault:
-  enabled: false
+  enabled: true
   address: "http://vault.vault.svc.cluster.local:8200"
   path: "secret"
   authMount: "kubernetes"
