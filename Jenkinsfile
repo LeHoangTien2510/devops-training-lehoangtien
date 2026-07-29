@@ -104,6 +104,25 @@ pipeline {
             }
         }
 
+        // ==================== SONARQUBE ====================
+        stage('SonarQube Analysis') {
+            steps {
+                dir('src/02-backend_spring-boot-rest-api') {
+                    sh '''
+                        echo "🔍 SonarQube: Phân tích code quality..."
+                        chmod +x mvnw
+                        ./mvnw sonar:sonar \
+                          -Dsonar.projectKey=demo-app \
+                          -Dsonar.projectName='Demo App' \
+                          -Dsonar.host.url=http://sonarqube:9000 \
+                          -Dsonar.login=admin \
+                          -Dsonar.password=admin \
+                          || echo "⚠️ SonarQube chưa sẵn sàng, bỏ qua..."
+                    '''
+                }
+            }
+        }
+
         // ==================== BUILD & PUSH ====================
         stage('Build & Push Backend') {
             steps {

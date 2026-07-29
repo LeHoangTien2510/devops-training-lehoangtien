@@ -17,6 +17,8 @@
         <java.version>17</java.version>
         <tomcat.version>10.1.55</tomcat.version>
         <spring-security.version>6.5.9</spring-security.version>
+        <sonar.host.url>http://52.7.207.155:9000</sonar.host.url>
+        <sonar.projectKey>demo-app</sonar.projectKey>
     </properties>
     <dependencies>
 
@@ -57,6 +59,11 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>5.0.0.4389</version>
             </plugin>
         </plugins>
     </build>

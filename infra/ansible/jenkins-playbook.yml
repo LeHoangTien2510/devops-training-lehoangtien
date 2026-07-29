@@ -119,7 +119,20 @@
         mode: "0755"
 
     # ============================================================
-    # 3. BUILD JENKINS IMAGE (CUSTOM)
+    # 3. TẠO DOCKER NETWORK CHO JENKINS + SONARQUBE
+    # ============================================================
+    - name: Tạo Docker network jenkins-net
+      command: docker network create jenkins-net
+      register: network_result
+      changed_when: "'already exists' not in network_result.stderr and network_result.rc != 0"
+      ignore_errors: true
+
+    - name: Hiển thị trạng thái network
+      debug:
+        msg: "🌐 Docker network 'jenkins-net': {{ 'đã tồn tại' if network_result.rc != 0 else 'đã tạo mới' }}"
+
+    # ============================================================
+    # 4. BUILD JENKINS IMAGE (CUSTOM)
     # ============================================================
     - name: Copy Dockerfile.jenkins lên server
       copy:
@@ -138,7 +151,7 @@
       changed_when: "'Successfully tagged' in build_result.stdout"
 
     # ============================================================
-    # 4. CHẠY JENKINS CONTAINER
+    # 5. CHẠY JENKINS CONTAINER
     # ============================================================
     - name: Dừng container Jenkins cũ (nếu có)
       command: docker rm -f {{ jenkins_container_name }}
@@ -150,6 +163,7 @@
         docker run -d
         --name {{ jenkins_container_name }}
         --restart unless-stopped
+        --network jenkins-net
         --group-add {{ docker_host_gid }}
         -p {{ jenkins_host_port }}:8080
         -p {{ jenkins_jnlp_port }}:50000
@@ -159,6 +173,26 @@
         {{ jenkins_image_name }}
       register: container_result
 
+    # ============================================================
+    # 5.1. CHẠY SONARQUBE CONTAINER (Code Quality)
+    # ============================================================
+    - name: Dừng container SonarQube cũ (nếu có)
+      command: docker rm -f sonarqube
+      ignore_errors: true
+      changed_when: false
+
+    - name: Chạy SonarQube container
+      command: >
+        docker run -d
+        --name sonarqube
+        --restart unless-stopped
+        --network jenkins-net
+        -p 9000:9000
+        -v sonarqube_data:/opt/sonarqube/data
+        -v sonarqube_extensions:/opt/sonarqube/extensions
+        sonarqube:community
+      register: sonar_result
+
     - name: Đợi Jenkins khởi động (30s)
       wait_for:
         port: 8080
@@ -166,7 +200,7 @@
         timeout: 120
 
     # ============================================================
-    # 5. LẤY INITIAL ADMIN PASSWORD
+    # 6. LẤY INITIAL ADMIN PASSWORD
     # ============================================================
     - name: Lấy Jenkins initial admin password
       command: cat {{ jenkins_home }}/secrets/initialAdminPassword

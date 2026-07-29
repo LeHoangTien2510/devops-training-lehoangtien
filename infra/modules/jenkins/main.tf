@@ -28,7 +28,7 @@ resource "aws_security_group" "jenkins" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32"]
+    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32", "42.116.64.102/32"]
     description = "SSH"
   }
 
@@ -37,8 +37,17 @@ resource "aws_security_group" "jenkins" {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32"]
+    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32", "42.116.64.102/32"]
     description = "Jenkins Web UI"
+  }
+
+  # SonarQube Web UI
+  ingress {
+    from_port   = 9000
+    to_port     = 9000
+    protocol    = "tcp"
+    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32", "42.116.64.102/32"]
+    description = "SonarQube Web UI"
   }
 
   # JNLP (Jenkins agent – nếu cần sau này)
