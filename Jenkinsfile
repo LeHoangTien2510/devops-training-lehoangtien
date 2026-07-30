@@ -76,7 +76,7 @@ pipeline {
             steps {
                 dir('src/03-frontend_angular-ecommerce') {
                     sh '''
-                        docker run --rm -v $(pwd):/app -w /app node:18-alpine \
+                        docker run --rm --memory=1g --memory-swap=1g -v $(pwd):/app -w /app node:18-alpine \
                           sh -c "npm install && npx ng lint --fix" || true
                     '''
                 }
@@ -97,7 +97,7 @@ pipeline {
             steps {
                 dir('src/03-frontend_angular-ecommerce') {
                     sh '''
-                        docker run --rm -v $(pwd):/app -w /app node:18-alpine \
+                        docker run --rm --memory=1g --memory-swap=1g -v $(pwd):/app -w /app node:18-alpine \
                           sh -c "npm install && npx ng test --watch=false --browsers=ChromeHeadlessNoSandbox" || true
                     '''
                 }

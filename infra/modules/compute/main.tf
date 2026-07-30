@@ -199,7 +199,7 @@ resource "helm_release" "vault" {
   depends_on = [helm_release.aws_lb_controller]
 
   values = [
-    file("${path.module}/../vault/vault-values.yaml")
+    file("${path.module}/../../vault/vault-values.yaml")
   ]
 }
 
