@@ -119,8 +119,7 @@ pipeline {
                               -Dsonar.projectKey=demo-app \
                               -Dsonar.projectName='Demo App' \
                               -Dsonar.host.url=http://sonarqube:9000 \
-                              -Dsonar.token=${SONAR_TOKEN} \
-                              || echo "⚠️ SonarQube chưa sẵn sàng, bỏ qua..."
+                              -Dsonar.token=${SONAR_TOKEN}
                         '''
                     }
                 }
