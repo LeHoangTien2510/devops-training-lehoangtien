@@ -65,7 +65,7 @@ class CheckoutServiceImplTest {
         item1.setImageUrl("img1.jpg");
         item1.setQuantity(1);
         item1.setUnitPrice(new BigDecimal("250000"));
-        item1.setProductId(1L);
+        item1.setProductsId(1L);
 
         // Tạo Purchase
         purchase = new Purchase();
