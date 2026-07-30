@@ -83,12 +83,12 @@ pipeline {
             }
         }
 
-        // ==================== TEST ====================
-        stage('Test Backend') {
+        // ==================== TEST BACKEND + COVERAGE ====================
+        stage('Test & Coverage Backend') {
             steps {
                 dir('src/02-backend_spring-boot-rest-api') {
                     sh 'chmod +x mvnw'
-                    sh './mvnw test'
+                    sh './mvnw test jacoco:report'
                 }
             }
         }
