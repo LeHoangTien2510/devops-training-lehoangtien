@@ -12,9 +12,10 @@ echo "============================================"
 echo "  VAULT: INIT + UNSEAL + STORE SECRETS"
 echo "============================================"
 
-# Đợi vault-0 ready
-echo "[1/4] Đợi Vault pods ready..."
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vault -n vault --timeout=300s
+# Đợi Vault pods Running (không thể đợi Ready vì Vault chỉ Ready sau khi init/unseal)
+echo "[1/4] Đợi Vault pods Running..."
+kubectl wait --for=jsonpath='{.status.phase}'=Running pod -l app.kubernetes.io/name=vault -n vault --timeout=300s
+sleep 10  # Đợi container khởi động hoàn tất
 
 # Init
 echo "[2/4] Khởi tạo Vault..."

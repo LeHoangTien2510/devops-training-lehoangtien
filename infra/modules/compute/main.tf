@@ -86,6 +86,24 @@ resource "helm_release" "ebs_csi" {
   }
 }
 
+# StorageClass gp3 (mặc định) – dùng cho PVC của Vault, MySQL, etc.
+resource "kubernetes_storage_class_v1" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+  storage_provisioner    = "ebs.csi.aws.com"
+  volume_binding_mode    = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+  parameters = {
+    type      = "gp3"
+    encrypted = "true"
+  }
+  depends_on = [helm_release.ebs_csi]
+}
+
 # =========================================================
 # IAM ROLE: AWS Load Balancer Controller
 # =========================================================
