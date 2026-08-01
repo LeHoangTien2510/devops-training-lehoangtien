@@ -13,7 +13,7 @@ spec:
 
   source:
     repoURL: https://github.com/lehoangtien2510/devops-training-lehoangtien
-    targetRevision: Week-5-CICD
+    targetRevision: Week-6-ArgoCD
     path: argocd/applications/stg
 
   destination:
