@@ -39,6 +39,7 @@ spec:
                 secretKeyRef:
                   name: mysql-secret
                   key: mysql-password
+                  optional: true
 {{- end }}
 
 ---
