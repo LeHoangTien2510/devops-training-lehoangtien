@@ -13,7 +13,6 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: ecommerce-backend
       app.kubernetes.io/component: backend
   namespaceSelector:
     matchNames:
