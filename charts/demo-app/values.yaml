@@ -74,7 +74,7 @@ ingress:
   host: ""
 
 serviceMonitor:
-  enabled: false
+  enabled: true
   interval: 30s
 
 certManager:

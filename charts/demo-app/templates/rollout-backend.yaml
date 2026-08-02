@@ -59,6 +59,9 @@ spec:
       steps:
         - setWeight: 10
         - pause: { duration: 60s }
+        - analysis:
+            templates:
+              - templateName: backend-error-rate-check
         - setWeight: 50
         - pause: { duration: 60s }
         - setWeight: 100
