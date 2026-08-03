@@ -24,4 +24,10 @@ public class CheckoutController {
         return purchaseResponse;
     }
 
+    // ⚠️ TEST: Endpoint luôn trả 500 — dùng để demo auto-rollback
+    @GetMapping("/error-test")
+    public String errorTest() {
+        throw new RuntimeException("Simulated 500 error for canary rollback demo!");
+    }
+
 }
