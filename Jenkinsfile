@@ -13,16 +13,18 @@ pipeline {
     agent any
 
     parameters {
-        choice(
-            name: 'DEPLOY_ENV',
-            choices: ['dev', 'dev+stg', 'dev+stg+prd'],
-            description: 'Deploy to which environments?'
-        )
+        string(name: 'APP_NAME', defaultValue: 'demo-app', description: 'Tên ứng dụng')
+        string(name: 'DOCKER_REPO', defaultValue: 'lehoangtien2510/ecommerce-backend', description: 'Docker Hub repo (vd: lehoangtien2510/my-app)')
+        string(name: 'GIT_BRANCH', defaultValue: 'Week-6-ArgoCD', description: 'Branch GitOps để update tag')
+        choice(name: 'DEPLOY_ENV', choices: ['dev', 'dev+stg', 'dev+stg+prd'], description: 'Deploy to which environments?')
     }
 
     environment {
-        DOCKER_REGISTRY = 'lehoangtien2510'
-        GITOPS_REPO     = 'github.com/lehoangtien2510/devops-training-lehoangtien'
+        APP_NAME    = "${params.APP_NAME}"
+        DOCKER_REPO = "${params.DOCKER_REPO}"
+        GIT_BRANCH  = "${params.GIT_BRANCH}"
+        IMAGE_TAG   = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        GITOPS_REPO = 'github.com/lehoangtien2510/devops-training-lehoangtien'
     }
 
     stages {
@@ -132,11 +134,11 @@ pipeline {
                 dir('src/02-backend_spring-boot-rest-api') {
                     sh '''
                         docker build \
-                          -t ${DOCKER_REGISTRY}/ecommerce-backend:${BUILD_NUMBER} \
-                          -t ${DOCKER_REGISTRY}/ecommerce-backend:latest \
+                          -t ${DOCKER_REPO}:${IMAGE_TAG} \
+                          -t ${DOCKER_REPO}:latest \
                           .
-                        docker push ${DOCKER_REGISTRY}/ecommerce-backend:${BUILD_NUMBER}
-                        docker push ${DOCKER_REGISTRY}/ecommerce-backend:latest
+                        docker push ${DOCKER_REPO}:${IMAGE_TAG}
+                        docker push ${DOCKER_REPO}:latest
                     '''
                 }
             }
@@ -147,11 +149,11 @@ pipeline {
                 dir('src/03-frontend_angular-ecommerce') {
                     sh '''
                         docker build \
-                          -t ${DOCKER_REGISTRY}/ecommerce-frontend:${BUILD_NUMBER} \
-                          -t ${DOCKER_REGISTRY}/ecommerce-frontend:latest \
+                          -t ${DOCKER_REPO}-frontend:${IMAGE_TAG} \
+                          -t ${DOCKER_REPO}-frontend:latest \
                           .
-                        docker push ${DOCKER_REGISTRY}/ecommerce-frontend:${BUILD_NUMBER}
-                        docker push ${DOCKER_REGISTRY}/ecommerce-frontend:latest
+                        docker push ${DOCKER_REPO}-frontend:${IMAGE_TAG}
+                        docker push ${DOCKER_REPO}-frontend:latest
                     '''
                 }
             }
@@ -163,10 +165,10 @@ pipeline {
                 sh '''
                     if command -v trivy &>/dev/null; then
                         trivy image --severity HIGH,CRITICAL --format table \
-                            ${DOCKER_REGISTRY}/ecommerce-backend:${BUILD_NUMBER} \
-                        || echo "## CẢNH BÁO: Backend có lỗ hổng HIGH/CRITICAL!"
+                            ${DOCKER_REPO}:${IMAGE_TAG} \
+                        || echo "## CANH BAO: Backend co lo hong HIGH/CRITICAL!"
                     else
-                        echo "⚠️  Bỏ qua Trivy scan (chưa cài đặt)"
+                        echo "⚠️  Bo qua Trivy scan (chua cai dat)"
                     fi
                 '''
             }
@@ -177,10 +179,10 @@ pipeline {
                 sh '''
                     if command -v trivy &>/dev/null; then
                         trivy image --severity HIGH,CRITICAL --format table \
-                            ${DOCKER_REGISTRY}/ecommerce-frontend:${BUILD_NUMBER} \
-                        || echo "## CẢNH BÁO: Frontend có lỗ hổng HIGH/CRITICAL!"
+                            ${DOCKER_REPO}-frontend:${IMAGE_TAG} \
+                        || echo "## CANH BAO: Frontend co lo hong HIGH/CRITICAL!"
                     else
-                        echo "⚠️  Bỏ qua Trivy scan (chưa cài đặt)"
+                        echo "⚠️  Bo qua Trivy scan (chua cai dat)"
                     fi
                 '''
             }
@@ -194,16 +196,16 @@ pipeline {
                     variable: 'GITHUB_TOKEN'
                 )]) {
                     sh '''
-                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_NUMBER}/}" charts/demo-app/values.yaml
-                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_NUMBER}/}" charts/demo-app/values.yaml
+                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${IMAGE_TAG}/}" charts/demo-app/values.yaml
+                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${IMAGE_TAG}/}" charts/demo-app/values.yaml
 
                         git config user.email "jenkins@devopsedu.vn"
                         git config user.name "Jenkins CI"
                         git remote set-url origin https://${GITHUB_TOKEN}@${GITOPS_REPO}
 
                         git add charts/demo-app/values.yaml
-                        git diff --cached --quiet || git commit -m "[CI] DEV: Update image tag to ${BUILD_NUMBER}"
-                        git push origin HEAD:Week-5-CICD 2>/dev/null || echo "## WARNING: Git push failed"
+                        git diff --cached --quiet || git commit -m "[CI] DEV: Update image tag to ${IMAGE_TAG}"
+                        git push origin HEAD:${GIT_BRANCH} 2>/dev/null || echo "## WARNING: Git push failed"
                     '''
                 }
             }
@@ -220,17 +222,16 @@ pipeline {
                     variable: 'GITHUB_TOKEN'
                 )]) {
                     sh '''
-                        BUILD_TAG=$(grep -A5 "^backend:" charts/demo-app/values.yaml | grep "tag:" | head -1 | awk "{print \$2}")
-                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-stg.yaml
-                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-stg.yaml
+                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${IMAGE_TAG}/}" charts/demo-app/values-stg.yaml
+                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${IMAGE_TAG}/}" charts/demo-app/values-stg.yaml
 
                         git config user.email "jenkins@devopsedu.vn"
                         git config user.name "Jenkins CI"
                         git remote set-url origin https://${GITHUB_TOKEN}@${GITOPS_REPO}
 
                         git add charts/demo-app/values-stg.yaml
-                        git commit -m "[CI] STG: Promote image tag to ${BUILD_TAG}"
-                        git push origin HEAD:Week-5-CICD 2>/dev/null || echo "## WARNING: Git push failed"
+                        git commit -m "[CI] STG: Promote image tag to ${IMAGE_TAG}"
+                        git push origin HEAD:${GIT_BRANCH} 2>/dev/null || echo "## WARNING: Git push failed"
                     '''
                 }
             }
@@ -247,17 +248,16 @@ pipeline {
                     variable: 'GITHUB_TOKEN'
                 )]) {
                     sh '''
-                        BUILD_TAG=$(grep -A5 "^backend:" charts/demo-app/values.yaml | grep "tag:" | head -1 | awk "{print \$2}")
-                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-prd.yaml
-                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${BUILD_TAG}/}" charts/demo-app/values-prd.yaml
+                        sed -i "/^backend:/,/^[a-z]/{s/tag:.*/tag: ${IMAGE_TAG}/}" charts/demo-app/values-prd.yaml
+                        sed -i "/^frontend:/,/^[a-z]/{s/tag:.*/tag: ${IMAGE_TAG}/}" charts/demo-app/values-prd.yaml
 
                         git config user.email "jenkins@devopsedu.vn"
                         git config user.name "Jenkins CI"
                         git remote set-url origin https://${GITHUB_TOKEN}@${GITOPS_REPO}
 
                         git add charts/demo-app/values-prd.yaml
-                        git commit -m "[CI] PRD: Promote image tag to ${BUILD_TAG}"
-                        git push origin HEAD:Week-5-CICD 2>/dev/null || echo "## WARNING: Git push failed"
+                        git commit -m "[CI] PRD: Promote image tag to ${IMAGE_TAG}"
+                        git push origin HEAD:${GIT_BRANCH} 2>/dev/null || echo "## WARNING: Git push failed"
                     '''
                 }
             }

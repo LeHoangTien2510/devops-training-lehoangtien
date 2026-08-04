@@ -1,0 +1,33 @@
+# =============================================================================
+# Internal Developer Platform – Documentation (MkDocs)
+# =============================================================================
+site_name: DevOps Platform Docs
+site_description: Internal Developer Platform Documentation
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Golden Path: golden-path.md
+      - Create New Service: create-service.md
+  - Platform:
+      - Architecture: architecture.md
+      - CI/CD Pipeline: cicd.md
+      - ArgoCD & GitOps: argocd.md
+  - Observability:
+      - Prometheus & Grafana: monitoring.md
+      - Auto Rollback: rollback.md
+  - Security:
+      - Vault & Secrets: vault.md
+      - Image Scanning: trivy.md
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - codehilite

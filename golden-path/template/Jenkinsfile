@@ -1,0 +1,87 @@
+# =============================================================================
+# Golden Path Template – Jenkins CI/CD Pipeline
+# Dev dùng file này, chỉ cần sửa APP_NAME, DOCKER_REPO, CHART_PATH
+# =============================================================================
+
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME       = '{{APP_NAME}}'
+        DOCKER_REPO    = 'lehoangtien2510/{{APP_NAME}}'
+        GITOPS_REPO    = 'devops-training-lehoangtien'
+        GITOPS_BRANCH  = 'Week-7-GoldenPath'
+        CHART_PATH     = 'charts/app-template'
+        VALUES_FILE    = 'values-{{ENV}}.yaml'
+    }
+
+    stages {
+        stage('Verify Tools') {
+            steps {
+                sh '''
+                    docker --version
+                    kubectl version --client
+                    helm version
+                '''
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
+                }
+            }
+        }
+
+        stage('Lint & Test') {
+            steps {
+                echo "Lint & Test for ${APP_NAME}"
+                // TODO: Add language-specific lint/test
+            }
+        }
+
+        stage('Build & Push') {
+            steps {
+                script {
+                    def imageTag = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.IMAGE_TAG = imageTag
+                }
+                sh '''
+                    docker build -t ${DOCKER_REPO}:${IMAGE_TAG} .
+                    docker push ${DOCKER_REPO}:${IMAGE_TAG}
+                    docker tag ${DOCKER_REPO}:${IMAGE_TAG} ${DOCKER_REPO}:latest
+                    docker push ${DOCKER_REPO}:latest
+                '''
+            }
+        }
+
+        stage('Trivy Scan') {
+            steps {
+                sh 'trivy image --severity HIGH,CRITICAL ${DOCKER_REPO}:${IMAGE_TAG}'
+            }
+        }
+
+        stage('Update GitOps') {
+            steps {
+                withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                    sh '''
+                        git clone https://${GH_TOKEN}@github.com/LeHoangTien2510/${GITOPS_REPO}.git gitops
+                        cd gitops
+                        sed -i "s/tag: .*/tag: ${IMAGE_TAG}/" ${CHART_PATH}/${VALUES_FILE}
+                        git add ${CHART_PATH}/${VALUES_FILE}
+                        git commit -m "[CI] ${APP_NAME}: Update image tag to ${IMAGE_TAG}" || true
+                        git push origin ${GITOPS_BRANCH}
+                    '''
+                }
+            }
+        }
+    }
+}

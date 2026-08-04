@@ -1,0 +1,44 @@
+# =============================================================================
+# Backstage – Internal Developer Portal
+# =============================================================================
+
+# Backstage Helm values (minimal)
+backstage:
+  image:
+    repository: backstageio/backstage
+    tag: latest
+
+  service:
+    type: ClusterIP
+    port: 7007
+
+  # --- Software Templates ---
+  templates:
+    - name: "Golden Path – Microservice"
+      description: "Tạo microservice mới với CI/CD + ArgoCD + Monitoring tự động"
+      repoUrl: "https://github.com/LeHoangTien2510/golden-path-template"
+      parameters:
+        - name: "App Name"
+          type: string
+          required: true
+        - name: "Port"
+          type: number
+          default: 8080
+        - name: "Language"
+          type: enum
+          options: ["Java", "Node.js", "Python"]
+          default: "Java"
+
+  # --- Catalog ---
+  catalog:
+    locations:
+      - type: url
+        target: https://github.com/LeHoangTien2510/devops-training-lehoangtien/blob/Week-7-GoldenPath/platform/catalog-info.yaml
+
+# --- Ingress ---
+ingress:
+  enabled: true
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+  path: /backstage

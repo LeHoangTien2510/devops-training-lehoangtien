@@ -1,0 +1,44 @@
+# =============================================================================
+# ApplicationSet: Tự động tạo ArgoCD Application cho mọi thư mục con
+# trong argocd/applications/dev/
+#
+# Dev chỉ cần tạo 1 file YAML trong thư mục → ArgoCD tự deploy
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: golden-path-apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/LeHoangTien2510/devops-training-lehoangtien
+        revision: Week-7-GoldenPath
+        directories:
+          - path: golden-path/apps/*
+  template:
+    metadata:
+      name: 'golden-{{.path.basename}}'
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/LeHoangTien2510/devops-training-lehoangtien
+        targetRevision: Week-7-GoldenPath
+        path: '{{.path.path}}'
+        helm:
+          valueFiles:
+            - values.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: demo-app
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+        automated:
+          prune: true
+          selfHeal: true

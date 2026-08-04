@@ -1,0 +1,40 @@
+# =============================================================================
+# Golden Path Template – Helm Chart Values
+# Dev chỉ cần điền: appName, image, port, replicas
+# CI/CD + ArgoCD + Monitoring TỰ ĐỘNG CÓ
+# =============================================================================
+
+# ─── App Info ───
+appName: {{APP_NAME}}
+namespace: demo-app
+environment: dev
+
+# ─── Image ───
+image:
+  repository: lehoangtien2510/{{APP_NAME}}
+  tag: latest
+  pullPolicy: Always
+
+# ─── Service ───
+service:
+  port: 8080
+  targetPort: 8080
+
+# ─── Resources ───
+replicaCount: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# ─── Whether to create ArgoCD Application ───
+argocd:
+  enabled: true
+
+# ─── Monitoring (Prometheus ServiceMonitor) ───
+monitoring:
+  enabled: true
+  metricsPath: /actuator/prometheus

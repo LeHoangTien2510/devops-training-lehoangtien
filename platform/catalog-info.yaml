@@ -1,0 +1,32 @@
+# =============================================================================
+# Backstage Catalog – Khai báo các service trong hệ thống
+# =============================================================================
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: demo-app
+  description: Full-stack ecommerce application (Angular + Spring Boot + MySQL)
+  annotations:
+    github.com/project-slug: LeHoangTien2510/devops-training-lehoangtien
+    argocd/app-name: demo-app-dev
+    prometheus.io/rule: http_server_requests_seconds_count
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: ecommerce
+  dependsOn:
+    - component:mysql
+    - component:vault
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: sample-service
+  description: Golden Path sample service (template demo)
+  annotations:
+    github.com/project-slug: LeHoangTien2510/devops-training-lehoangtien
+spec:
+  type: service
+  lifecycle: experimental
+  owner: platform-team
