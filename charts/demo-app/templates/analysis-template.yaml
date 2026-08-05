@@ -1,8 +1,7 @@
 # =============================================================================
-# AnalysisTemplate: Auto-rollback nếu error rate > 5%
-# Gắn vào backend Rollout qua strategy.canary.steps[].analysis
-# Yêu cầu: Prometheus (kube-prometheus-stack) đã cài trong namespace monitoring
-#          Backend expose /actuator/prometheus (Micrometer)
+# AnalysisTemplate: Đánh giá error rate qua NGINX Ingress Controller
+# Đo ở tầng Ingress (F5 NGINX) thay vì actuator → kể cả backend chết cũng có metric
+# Yêu cầu: NGINX Ingress Controller đã cài + bật metrics + ServiceMonitor
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
@@ -12,17 +11,18 @@ metadata:
 spec:
   metrics:
     - name: error-rate
-      interval: 30s
-      count: 3
-      # or vector(0) → nếu không có 5xx error, mặc định trả về 0 (thành công)
-      successCondition: result[0] < 0.05
-      failureLimit: 1
+      interval: 15s
+      count: 4                  # đo 4 lần × 15s = 60s
+      # error rate < 1% → pass; >= 5% liên tiếp 3 lần → fail → auto rollback
+      successCondition: result[0] < 0.01
+      failureCondition: result[0] >= 0.05
+      failureLimit: 3
       provider:
         prometheus:
           address: http://kube-prometheus-stack-prometheus.demo-app:9090
           query: |
             (
-              rate(http_server_requests_seconds_count{status=~"5..",job="ecommerce-backend"}[1m])
+              sum(rate(nginx_ingress_controller_requests{namespace="{{ .Values.namespace }}", exported_service="ecommerce-backend", status=~"5.."}[2m]))
               /
-              rate(http_server_requests_seconds_count{job="ecommerce-backend"}[1m])
+              clamp_min(sum(rate(nginx_ingress_controller_requests{namespace="{{ .Values.namespace }}", exported_service="ecommerce-backend"}[2m])), 1)
             ) or vector(0)

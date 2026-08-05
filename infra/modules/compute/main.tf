@@ -148,6 +148,34 @@ resource "helm_release" "aws_lb_controller" {
 }
 
 # =========================================================
+# HELM: Cài NGINX Ingress Controller (F5) – dùng cho Prometheus metrics analysis
+# =========================================================
+resource "helm_release" "nginx_ingress" {
+  name       = "ingress-nginx"
+  repository = "https://kubernetes.github.io/ingress-nginx"
+  chart      = "ingress-nginx"
+  namespace  = "ingress-nginx"
+  create_namespace = true
+  wait       = true
+  timeout    = 600
+
+  depends_on = [helm_release.aws_lb_controller]
+
+  set {
+    name  = "controller.metrics.enabled"
+    value = "true"
+  }
+  set {
+    name  = "controller.metrics.serviceMonitor.enabled"
+    value = "true"
+  }
+  set {
+    name  = "controller.ingressClassResource.name"
+    value = "nginx"
+  }
+}
+
+# =========================================================
 # HELM: Cài cert-manager (TLS)
 # =========================================================
 resource "helm_release" "cert_manager" {
