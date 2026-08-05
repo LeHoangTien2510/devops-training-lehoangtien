@@ -1,8 +1,9 @@
 # =============================================================================
 # ApplicationSet: Tự động tạo ArgoCD Application cho mọi thư mục con
-# trong argocd/applications/dev/
+# trong golden-path/apps/
 #
-# Dev chỉ cần tạo 1 file YAML trong thư mục → ArgoCD tự deploy
+# DevOps: maintain golden-path/shared-chart/ (Helm chart dùng chung)
+# Dev:    chỉ cần tạo 1 file values.yaml trong golden-path/apps/<app>/
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -15,7 +16,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/LeHoangTien2510/devops-training-lehoangtien
-        revision: HEAD   # Dev: luôn mới nhất. Prd: đổi thành tag (vd: v1.0.0)
+        revision: Week-7-GoldenPath
         directories:
           - path: golden-path/apps/*
   template:
@@ -28,11 +29,12 @@ spec:
       project: default
       source:
         repoURL: https://github.com/LeHoangTien2510/devops-training-lehoangtien
-        targetRevision: HEAD   # Dev: HEAD. Stg/Prd: branch hoặc tag cụ thể
-        path: '{{.path.path}}'
+        targetRevision: Week-7-GoldenPath
+        # Shared chart (DevOps maintain) + per-app values (Dev tạo)
+        path: golden-path/shared-chart
         helm:
           valueFiles:
-            - values.yaml
+            - ../../golden-path/apps/{{.path.basename}}/values.yaml
       destination:
         server: https://kubernetes.default.svc
         namespace: demo-app
