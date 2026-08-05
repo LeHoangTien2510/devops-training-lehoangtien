@@ -14,7 +14,8 @@ spec:
     - name: error-rate
       interval: 30s
       count: 3
-      successCondition: result[0] < 0.05
+      # default(result, [0])[0] → nếu query trả về rỗng (chưa có traffic), mặc định = 0 (thành công)
+      successCondition: default(result, [0])[0] < 0.05
       failureLimit: 1
       provider:
         prometheus:
