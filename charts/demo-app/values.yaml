@@ -52,7 +52,7 @@ frontend:
   enabled: true
   image:
     repository: lehoangtien2510/ecommerce-frontend
-    tag: buggy
+    tag: latest
     pullPolicy: Always
   replicaCount: 2
   service:
