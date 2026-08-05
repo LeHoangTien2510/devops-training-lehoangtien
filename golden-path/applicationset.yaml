@@ -15,7 +15,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/LeHoangTien2510/devops-training-lehoangtien
-        revision: Week-7-GoldenPath
+        revision: HEAD   # Dev: luôn mới nhất. Prd: đổi thành tag (vd: v1.0.0)
         directories:
           - path: golden-path/apps/*
   template:
@@ -28,7 +28,7 @@ spec:
       project: default
       source:
         repoURL: https://github.com/LeHoangTien2510/devops-training-lehoangtien
-        targetRevision: Week-7-GoldenPath
+        targetRevision: HEAD   # Dev: HEAD. Stg/Prd: branch hoặc tag cụ thể
         path: '{{.path.path}}'
         helm:
           valueFiles:

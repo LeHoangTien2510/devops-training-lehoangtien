@@ -14,7 +14,7 @@ spec:
 
   source:
     repoURL: https://github.com/lehoangtien2510/devops-training-lehoangtien
-    targetRevision: Week-6-ArgoCD
+    targetRevision: HEAD   # Luôn đọc từ branch mặc định, không hardcode tên branch
     path: argocd/applications/dev          # ← Trỏ vào thư mục chứa app con
 
   destination:
