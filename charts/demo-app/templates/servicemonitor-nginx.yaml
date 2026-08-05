@@ -1,0 +1,22 @@
+# =============================================================================
+# ServiceMonitor cho NGINX Ingress Controller – trong namespace demo-app
+# Để Prometheus (cùng namespace) scrape metrics từ NGINX
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nginx-ingress-controller
+  namespace: {{ .Values.namespace }}
+  labels:
+    release: kube-prometheus-stack
+spec:
+  endpoints:
+    - interval: 30s
+      port: metrics
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - ingress-nginx
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
