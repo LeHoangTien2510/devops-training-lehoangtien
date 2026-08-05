@@ -1,5 +1,0 @@
-apiVersion: v2
-name: landing-page
-description: Landing Page - Golden Path Demo
-type: application
-version: 1.0.0

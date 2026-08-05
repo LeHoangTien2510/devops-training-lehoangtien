@@ -1,5 +1,0 @@
-apiVersion: v2
-name: sample-service
-description: Golden Path Sample Service
-type: application
-version: 0.1.0

@@ -1,5 +1,0 @@
-apiVersion: v2
-name: html-app-deployed
-description: "HTML App - Golden Path Demo by Dev Nam"
-type: application
-version: 1.0.0
