@@ -173,6 +173,14 @@ resource "helm_release" "nginx_ingress" {
     name  = "controller.ingressClassResource.name"
     value = "nginx"
   }
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
+    value = "internal"
+  }
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"
+    value = "nlb"
+  }
 }
 
 # =========================================================
