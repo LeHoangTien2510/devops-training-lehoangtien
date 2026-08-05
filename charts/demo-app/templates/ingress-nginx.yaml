@@ -1,0 +1,25 @@
+# =============================================================================
+# NGINX Ingress cho Backend – dùng cho Prometheus metrics analysis
+# Ingress này để NGINX Controller ghi nhận metrics về traffic backend
+# =============================================================================
+{{- if .Values.backend.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.backend.service.name }}-nginx
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.backend.service.name }}
+                port:
+                  number: {{ .Values.backend.service.port }}
+{{- end }}
