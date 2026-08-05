@@ -1,0 +1,37 @@
+# =============================================================================
+# Golden Path Template – Helm Chart Values
+# Dev chỉ cần điền: appName, image, port, replicas
+# CI/CD + ArgoCD + Monitoring TỰ ĐỘNG CÓ
+# =============================================================================
+
+# ─── App Info ───
+appName: html-app-deployed
+namespace: demo-app
+environment: dev
+
+# ─── Image ───
+image:
+  repository: lehoangtien2510/html-app-deployed
+  tag: latest
+  pullPolicy: Always
+
+# ─── Service ───
+service:
+  port: 80
+  targetPort: 80
+
+# ─── Resources ───
+replicaCount: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+argocd:
+  enabled: true
+
+monitoring:
+  enabled: false
