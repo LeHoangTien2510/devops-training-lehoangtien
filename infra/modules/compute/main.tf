@@ -249,9 +249,11 @@ resource "helm_release" "kube_prometheus" {
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"
   namespace  = "demo-app"
-  create_namespace = false
+  create_namespace = true
   wait       = true
   timeout    = 600
+
+  depends_on = [helm_release.aws_lb_controller]
 
   values = [file("${path.module}/../../observability/kube-prometheus-stack-values.yaml")]
 }
