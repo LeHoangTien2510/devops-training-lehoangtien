@@ -1,0 +1,24 @@
+# Golden Path – Landing Page Demo
+appName: landing-page
+namespace: demo-app
+image:
+  repository: nginx
+  tag: alpine
+  pullPolicy: IfNotPresent
+service:
+  port: 80
+  targetPort: 80
+replicaCount: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+monitoring:
+  enabled: true
+  metricsPath: /metrics
+health:
+  livenessPath: /
+  readinessPath: /

@@ -1,0 +1,140 @@
+# ─── Deployment ───
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.appName }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appName }}
+    spec:
+      containers:
+        - name: {{ .Values.appName }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: html
+          configMap:
+            name: {{ .Values.appName }}-html
+---
+# ─── ConfigMap: Landing Page HTML ───
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.appName }}-html
+  namespace: {{ .Values.namespace }}
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>🚀 Golden Path Demo</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        }
+        .card {
+          background: white; border-radius: 16px; padding: 48px;
+          max-width: 600px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { font-size: 48px; margin-bottom: 8px; }
+        h2 { color: #667eea; margin-bottom: 24px; }
+        .info { background: #f7f8fc; border-radius: 12px; padding: 24px; margin: 16px 0; text-align: left; }
+        .info p { margin: 8px 0; color: #555; }
+        .badge {
+          display: inline-block; background: #667eea; color: white;
+          padding: 6px 16px; border-radius: 20px; font-size: 14px; margin: 4px;
+        }
+        .status { color: #22c55e; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>🚀</h1>
+        <h2>Golden Path – Internal Developer Platform</h2>
+        <p>App này được deploy <b>tự động</b> qua GitOps pipeline!</p>
+
+        <div class="info">
+          <p>🏷️ <b>App:</b> {{ .Values.appName }}</p>
+          <p>📦 <b>Namespace:</b> {{ .Values.namespace }}</p>
+          <p>🐳 <b>Image:</b> {{ .Values.image.repository }}:{{ .Values.image.tag }}</p>
+          <p>🔄 <b>Replicas:</b> {{ .Values.replicaCount }}</p>
+        </div>
+
+        <div>
+          <span class="badge">GitOps</span>
+          <span class="badge">ArgoCD</span>
+          <span class="badge">GitHub Actions</span>
+          <span class="badge">Cosign Signed</span>
+        </div>
+
+        <p style="margin-top: 16px; color: #888; font-size: 14px;">
+          ⚡ Deploy time: ~3 phút từ lúc push code<br>
+          🔄 Auto-sync qua ArgoCD ApplicationSet
+        </p>
+      </div>
+    </body>
+    </html>
+---
+# ─── Service ───
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.appName }}
+spec:
+  selector:
+    app: {{ .Values.appName }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+---
+# ─── ServiceMonitor (Prometheus) ───
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.namespace }}
+spec:
+  endpoints:
+    - interval: 30s
+      path: {{ .Values.monitoring.metricsPath }}
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+{{- end }}
