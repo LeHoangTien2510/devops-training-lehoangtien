@@ -1,0 +1,77 @@
+# =============================================================================
+# Backstage – Internal Developer Portal
+# kubectl apply -f platform/backstage-deploy.yaml
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backstage
+---
+# --- ConfigMap: Backstage app-config.yaml ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-config
+  namespace: backstage
+data:
+  app-config.yaml: |
+    app:
+      title: DevOps Platform
+      baseUrl: http://localhost:7007
+    organization:
+      name: DevOps Training
+    backend:
+      baseUrl: http://localhost:7007
+      cors:
+        origin: http://localhost:7007
+    catalog:
+      locations:
+        - type: url
+          target: https://github.com/LeHoangTien2510/devops-training-lehoangtien/blob/Week-7-GoldenPath/platform/catalog-info.yaml
+---
+# --- Deployment: Backstage server ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      containers:
+        - name: backstage
+          image: backstageio/backstage:latest
+          ports:
+            - containerPort: 7007
+          env:
+            - name: APP_CONFIG_app_baseUrl
+              value: "http://localhost:7007"
+          volumeMounts:
+            - name: config
+              mountPath: /app/app-config.yaml
+              subPath: app-config.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: backstage-config
+---
+# --- Service ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  type: ClusterIP
+  selector:
+    app: backstage
+  ports:
+    - port: 7007
+      targetPort: 7007

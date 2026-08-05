@@ -1,10 +1,12 @@
 # =============================================================================
 # Backstage – Internal Developer Portal
+# Cài: helm upgrade --install backstage backstage/backstage -n backstage -f values.yaml
 # =============================================================================
 
-# Backstage Helm values (minimal)
+# Backstage server configuration
 backstage:
   image:
+    registry: docker.io
     repository: backstageio/backstage
     tag: latest
 
@@ -12,33 +14,42 @@ backstage:
     type: ClusterIP
     port: 7007
 
-  # --- Software Templates ---
-  templates:
-    - name: "Golden Path – Microservice"
-      description: "Tạo microservice mới với CI/CD + ArgoCD + Monitoring tự động"
-      repoUrl: "https://github.com/LeHoangTien2510/golden-path-template"
-      parameters:
-        - name: "App Name"
-          type: string
-          required: true
-        - name: "Port"
-          type: number
-          default: 8080
-        - name: "Language"
-          type: enum
-          options: ["Java", "Node.js", "Python"]
-          default: "Java"
+  # App config (catalog locations, integrations)
+  appConfig:
+    app:
+      title: DevOps Platform
+      baseUrl: http://localhost:7007
+    organization:
+      name: DevOps Training
+    backend:
+      baseUrl: http://localhost:7007
+      cors:
+        origin: http://localhost:7007
+    catalog:
+      locations:
+        - type: url
+          target: https://github.com/LeHoangTien2510/devops-training-lehoangtien/blob/Week-7-GoldenPath/platform/catalog-info.yaml
+    integrations:
+      github:
+        - host: github.com
+          token: ${GITHUB_TOKEN}
 
-  # --- Catalog ---
-  catalog:
-    locations:
-      - type: url
-        target: https://github.com/LeHoangTien2510/devops-training-lehoangtien/blob/Week-7-GoldenPath/platform/catalog-info.yaml
+  extraEnv:
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: backstage-github-token
+          key: GITHUB_TOKEN
 
-# --- Ingress ---
+# Ingress for external access
 ingress:
   enabled: true
+  className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-  path: /backstage
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
