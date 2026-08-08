@@ -2,7 +2,7 @@
 # Default values for demo-app (3-tier: Angular + Spring Boot + MySQL)
 # Jenkins sẽ tự động cập nhật tag image khi build xong
 # =============================================================================
-namespace: demo-app
+namespace: demo-app-dev
 environment: dev
 
 mysql:

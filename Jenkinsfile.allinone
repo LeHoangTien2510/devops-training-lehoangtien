@@ -35,7 +35,7 @@ pipeline {
         // ─── Project & Environment ───
         string(name: 'PROJECT_NAME',  defaultValue: 'demo-app', description: 'Tên project (demo-app)')
         choice(name: 'ENVIRONMENT',   choices: ['dev', 'stg', 'prd'], description: 'Môi trường deploy')
-        string(name: 'GIT_BRANCH',    defaultValue: 'Week-6-ArgoCD', description: 'Branch source code')
+        string(name: 'GIT_BRANCH',    defaultValue: 'Week-8-CI-full', description: 'Branch source code')
 
         // ─── Module selection (giống mentor: chọn component cần deploy) ───
         string(name: 'MODULE_DEPLOY', defaultValue: 'backend,frontend',
@@ -48,7 +48,7 @@ pipeline {
                description: 'Docker Hub repo cho frontend')
 
         // ─── Vault Configuration ───
-        string(name: 'VAULT_ADDR',     defaultValue: 'http://vault-nlb-placeholder:8200',
+        string(name: 'VAULT_ADDR',     defaultValue: 'http://k8s-vault-vault-978d573894-0c92ff37df2c445c.elb.us-east-1.amazonaws.com:8200',
                description: 'Vault Internal NLB URL (cùng VPC với Jenkins)')
         string(name: 'VAULT_APP_PATH', defaultValue: 'secret/demo-app/mysql',
                description: 'Vault path cho app secrets (MySQL, API keys...)')

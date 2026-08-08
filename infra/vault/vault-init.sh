@@ -100,7 +100,9 @@ echo '✅ Kubernetes auth configured'
 # Jenkins Policy – Đọc tất cả secret cần thiết
 # ═══════════════════════════════════════════════════════════════
 vault policy write jenkins-pipeline - <<POLICY
-path \"secret/data/demo-app/*\" { capabilities = [\"read\"] }path "secret/data/common/*" { capabilities = ["read"] }path \"auth/token/lookup-self\" { capabilities = [\"read\"] }
+path "secret/data/demo-app/*" { capabilities = ["read"] }
+path "secret/data/common/*" { capabilities = ["read"] }
+path "auth/token/lookup-self" { capabilities = ["read"] }
 POLICY
 
 # ═══════════════════════════════════════════════════════════════
