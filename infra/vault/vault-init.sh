@@ -101,7 +101,9 @@ echo '✅ Kubernetes auth configured'
 # ═══════════════════════════════════════════════════════════════
 vault policy write jenkins-pipeline - <<POLICY
 path "secret/data/demo-app/*" { capabilities = ["read"] }
+path "secret/metadata/demo-app/*" { capabilities = ["read"] }
 path "secret/data/common/*" { capabilities = ["read"] }
+path "secret/metadata/common/*" { capabilities = ["read"] }
 path "auth/token/lookup-self" { capabilities = ["read"] }
 POLICY
 
