@@ -23,12 +23,12 @@ resource "aws_security_group" "jenkins" {
   description = "Jenkins CI/CD server"
   vpc_id      = var.vpc_id
 
-  # SSH từ mọi nơi (nên giới hạn IP của bạn sau này)
+  # SSH
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32", "42.116.64.102/32", "183.80.60.85/32"]
+    cidr_blocks = ["14.232.69.20/32"]
     description = "SSH"
   }
 
@@ -37,7 +37,7 @@ resource "aws_security_group" "jenkins" {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32", "42.116.64.102/32", "183.80.60.85/32"]
+    cidr_blocks = ["14.232.69.20/32"]
     description = "Jenkins Web UI"
   }
 
@@ -46,7 +46,7 @@ resource "aws_security_group" "jenkins" {
     from_port   = 9000
     to_port     = 9000
     protocol    = "tcp"
-    cidr_blocks = ["14.232.69.20/32", "118.71.65.73/32", "42.116.64.102/32", "183.80.60.85/32"]
+    cidr_blocks = ["14.232.69.20/32"]
     description = "SonarQube Web UI"
   }
 

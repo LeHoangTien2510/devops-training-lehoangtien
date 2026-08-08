@@ -10,14 +10,8 @@ mysql:
   image:
     repository: mysql
     tag: "8.0"
-  # 🔐 Secrets được quản lý bởi Vault + External Secrets Operator
-  # Khi vault.enabled=true, ESO tự động tạo K8s Secret từ Vault
-  # Khi vault.enabled=false, tạo secret thủ công:
-  #    kubectl create secret generic mysql-secret -n demo-app \
-  #      --from-literal=mysql-root-password=... \
-  #      --from-literal=mysql-database=full-stack-ecommerce \
-  #      --from-literal=mysql-user=ecommerceapp \
-  #      --from-literal=mysql-password=...
+  # 🔐 Secrets được Jenkins quản lý: kubectl create secret mysql-secret
+  #    (đọc từ Vault: secret/demo-app/mysql)
   auth:
     database: "full-stack-ecommerce"
     username: "ecommerceapp"
@@ -36,7 +30,7 @@ backend:
   enabled: true
   image:
     repository: lehoangtien2510/ecommerce-backend
-    tag: buggy
+    tag: latest
     pullPolicy: Always
   replicaCount: 2
   service:
@@ -82,19 +76,10 @@ certManager:
   issuerName: selfsigned-issuer
 
 # =============================================================================
-# Vault Integration – External Secrets Operator
+# Secrets – Jenkins quản lý toàn bộ (KHÔNG dùng ESO, KHÔNG dùng Helm secret)
 # =============================================================================
-# ESO tự động sync secrets từ Vault → Kubernetes Secrets.
-# Không cần tạo secret thủ công nữa!
-#
-# Yêu cầu: Vault + ESO đã được cài (chạy infra/vault/install-vault.sh)
-vault:
-  enabled: true
-  address: "http://vault.vault.svc.cluster.local:8200"
-  path: "secret"
-  authMount: "kubernetes"
-  role: "demo-app"
-  serviceAccount: "demo-app"
-  refreshInterval: "1h"
-  secretPath:
-    mysql: "secret/demo-app/mysql"
+# Flow:
+#   1. Jenkins đọc Vault → vault kv get secret/demo-app/mysql
+#   2. Jenkins kubectl create secret generic mysql-secret
+#   3. MySQL + Backend đọc mysql-secret từ K8s
+# =============================================================================

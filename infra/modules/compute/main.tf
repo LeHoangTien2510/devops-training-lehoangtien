@@ -148,7 +148,22 @@ resource "helm_release" "aws_lb_controller" {
 }
 
 # =========================================================
-# HELM: Cài NGINX Ingress Controller (F5) – dùng cho Prometheus metrics analysis
+# CRD: ServiceMonitor – cần trước khi cài NGINX Ingress (ServiceMonitor)
+# =========================================================
+# Prometheus CRDs không được Helm quản lý → cần cài thủ công
+resource "null_resource" "servicemonitor_crd" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws eks update-kubeconfig --region ${var.aws_region} --name ${var.cluster_name} --profile ${var.aws_profile}
+      kubectl apply --validate=false -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+    EOT
+    interpreter = ["/bin/bash", "-c"]
+  }
+  depends_on = [module.eks]
+}
+
+# =========================================================
+# HELM: Cài NGINX Ingress Controller – dùng cho Prometheus metrics analysis
 # =========================================================
 resource "helm_release" "nginx_ingress" {
   name       = "ingress-nginx"
@@ -159,7 +174,7 @@ resource "helm_release" "nginx_ingress" {
   wait       = true
   timeout    = 600
 
-  depends_on = [helm_release.aws_lb_controller]
+  depends_on = [helm_release.aws_lb_controller, null_resource.servicemonitor_crd]
 
   set {
     name  = "controller.metrics.enabled"
@@ -241,6 +256,20 @@ resource "helm_release" "argo_rollouts" {
 # =========================================================
 # HELM: Cài HashiCorp Vault (Secret Management)
 # =========================================================
+# Khi destroy: force-delete namespace trước để tránh deadlock PVC/NLB
+resource "null_resource" "vault_cleanup" {
+  triggers = {
+    helm_release = helm_release.vault.id
+  }
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      kubectl delete namespace vault --force --grace-period=0 --timeout=30s 2>/dev/null || true
+      kubectl get ns vault -o json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); d['spec']['finalizers']=[]; print(json.dumps(d))" | kubectl replace --raw "/api/v1/namespaces/vault/finalize" -f - 2>/dev/null || true
+    EOT
+  }
+}
+
 resource "helm_release" "vault" {
   name             = "vault"
   repository       = "https://helm.releases.hashicorp.com"
@@ -255,26 +284,6 @@ resource "helm_release" "vault" {
   values = [
     file("${path.module}/../../vault/vault-values.yaml")
   ]
-}
-
-# =========================================================
-# HELM: Cài External Secrets Operator (cầu nối Vault → K8s)
-# =========================================================
-resource "helm_release" "external_secrets" {
-  name             = "external-secrets"
-  repository       = "https://charts.external-secrets.io"
-  chart            = "external-secrets"
-  namespace        = "external-secrets"
-  create_namespace = true
-  wait             = true
-  timeout          = 300
-
-  depends_on = [helm_release.aws_lb_controller]
-
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
 }
 
 # =========================================================

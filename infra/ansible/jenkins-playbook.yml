@@ -200,8 +200,24 @@
         timeout: 120
 
     # ============================================================
-    # 6. LẤY INITIAL ADMIN PASSWORD
+    # 6. COPY KUBECONFIG + LẤY INITIAL ADMIN PASSWORD
     # ============================================================
+    - name: Copy kubeconfig vào Jenkins container (nếu có ~/.kube/config)
+      shell: |
+        if [ -f ~/.kube/config ]; then
+          docker cp ~/.kube/config jenkins:/var/jenkins_home/.kube/config
+          docker exec -u root jenkins chown jenkins:jenkins /var/jenkins_home/.kube/config
+          echo "✅ Kubeconfig copied"
+        else
+          echo "⚠️  ~/.kube/config not found – skip"
+        fi
+      register: kubeconfig_copy
+      changed_when: false
+
+    - name: Hiển thị trạng thái kubeconfig
+      debug:
+        msg: "{{ kubeconfig_copy.stdout }}"
+
     - name: Lấy Jenkins initial admin password
       command: cat {{ jenkins_home }}/secrets/initialAdminPassword
       register: admin_password

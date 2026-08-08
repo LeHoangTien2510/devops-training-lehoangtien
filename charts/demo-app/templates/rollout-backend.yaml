@@ -1,7 +1,6 @@
 # =============================================================================
 # Argo Rollouts: Canary deployment cho Backend
 # 10% → pause 60s → 50% → pause 60s → 100%
-# Không cần Prometheus (time-based)
 # =============================================================================
 {{- if .Values.backend.enabled }}
 apiVersion: argoproj.io/v1alpha1

@@ -1,12 +1,19 @@
 # =============================================================================
-# Custom Jenkins Image – có sẵn Docker CLI + Trivy
+# Custom Jenkins Image – Docker CLI + Trivy + Vault CLI + kubectl
 # Build:  docker build -t jenkins-cicd:latest -f Dockerfile.jenkins .
+# Run:
+#   docker run -d --name jenkins \
+#     -p 8080:8080 -p 50000:50000 \
+#     -v /var/run/docker.sock:/var/run/docker.sock \
+#     -v jenkins_home:/var/jenkins_home \
+#     --group-add $(stat -c '%g' /var/run/docker.sock) \
+#     jenkins-cicd:latest
 # =============================================================================
 FROM jenkins/jenkins:lts
 
 USER root
 
-# ---------- Cài Docker CLI (để giao tiếp với Docker daemon trên host) ----------
+# ---------- Cài Docker CLI ----------
 RUN apt-get update && apt-get install -y \
     ca-certificates curl gnupg lsb-release \
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
@@ -18,24 +25,37 @@ RUN apt-get update && apt-get install -y \
 # ---------- Cài Trivy (scan image security) ----------
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-# ---------- Cài thêm tool hữu ích ----------
-RUN apt-get update && apt-get install -y \
-    jq \
-    unzip \
+# ---------- Cài kubectl ----------
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
+    && rm kubectl
+
+# ---------- Cài HashiCorp Vault CLI ----------
+RUN apt-get update && apt-get install -y gnupg curl unzip \
+    && VAULT_VERSION=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/vault | grep -o '"current_version":"[^"]*"' | cut -d'"' -f4) \
+    && curl -LO "https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip" \
+    && unzip vault_${VAULT_VERSION}_linux_amd64.zip -d /usr/local/bin/ \
+    && rm vault_${VAULT_VERSION}_linux_amd64.zip \
+    && chmod +x /usr/local/bin/vault \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ---------- Tạo Docker group với cùng GID như host (quan trọng!) ----------
-# Khi chạy container, truyền --group-add <DOCKER_GID> để Jenkins user dùng được docker sock
+# ---------- Cài thêm tool ----------
+RUN apt-get update && apt-get install -y \
+    jq unzip python3 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ---------- Docker group ----------
 ARG DOCKER_GID=999
 RUN groupadd -g ${DOCKER_GID} docker-host || true \
     && usermod -aG docker-host jenkins
 
 USER jenkins
 
-# ---------- Cài sẵn Jenkins plugins ----------
+# ---------- Jenkins plugins ----------
 RUN jenkins-plugin-cli --plugins \
     workflow-aggregator \
     git \
     docker-workflow \
     credentials-binding \
-    blueocean
+    blueocean \
+    hashicorp-vault-plugin

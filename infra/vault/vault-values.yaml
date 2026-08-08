@@ -1,7 +1,13 @@
 # =============================================================================
-# Vault Helm Values – HA mode với Raft storage
+# Vault Helm Values – HA mode với Raft storage + Internal NLB cho Jenkins
 # =============================================================================
 # Usage: helm install vault hashicorp/vault -n vault -f vault-values.yaml
+#
+# Kiến trúc:
+#   Vault (HA x3, Raft) → Internal NLB → Jenkins EC2 (cùng VPC)
+#   Jenkins dùng AppRole auth để đọc secret, sau đó tạo K8s Secret qua kubectl
+#
+# KHÔNG dùng ESO nữa – Jenkins trực tiếp quản lý secret lifecycle
 
 global:
   enabled: true
@@ -39,6 +45,10 @@ server:
 
         service_registration "kubernetes" {}
 
+  # Auth backends (khai báo trong config để vault tự động enable)
+  # AppRole: cho Jenkins machine-to-machine auth
+  # Kubernetes: giữ lại cho fallback / tooling
+
   # Resources
   resources:
     requests:
@@ -54,16 +64,34 @@ server:
     size: 10Gi
     storageClass: gp3
 
-  # Service
+  # =========================================================================
+  # Service: Internal NLB → Jenkins EC2 có thể gọi từ trong VPC
+  # =========================================================================
   service:
     enabled: true
-    type: ClusterIP
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    ports:
+      - name: http
+        port: 8200
+        targetPort: 8200
+        protocol: TCP
 
   # UI
   ui:
     enabled: true
     serviceType: ClusterIP
 
-# Injector (sidecar – optional, dùng ESO là chính)
+# =========================================================================
+# Vault Agent Injector – tự động inject secret vào Pod qua sidecar
+# =========================================================================
+# Flow: Pod có annotation vault.hashicorp.com/agent-inject=true
+#       → Mutating Webhook thêm init container + sidecar
+#       → Sidecar auth với Vault (K8s SA) → ghi secret vào file
+#       → App container đọc từ file (/vault/secrets/...)
+# Injector (không dùng – Jenkins tự tạo K8s Secret)
 injector:
   enabled: false

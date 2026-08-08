@@ -42,3 +42,17 @@ spec:
     automated:
       prune: true      # Xóa resources không còn trong Git
       selfHeal: true   # Tự sửa nếu ai đó sửa trực tiếp trên cluster
+
+  # ═══════════════════════════════════════════════════════════════
+  # PUSH CD MODE: Bỏ qua image tag (Jenkins quản lý qua kubectl set image)
+  # ArgoCD vẫn selfHeal các field khác (replicas, resources, env...)
+  # ═══════════════════════════════════════════════════════════════
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+    - group: argoproj.io
+      kind: Rollout
+      jsonPointers:
+        - /spec/template/spec/containers/0/image

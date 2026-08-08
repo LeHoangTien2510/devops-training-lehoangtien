@@ -12,21 +12,29 @@
  │ Jenkins  │  │ Rancher  │  << SG: IP whitelist only
  │ EC2 :8080│  │ EC2 :443 │
  └────┬─────┘  └──────────┘
-      │ CI/CD Pipeline: Build → Push → ArgoCD sync
-      ▼
+      │ CI/CD Pipeline:
+      │   1. Auth Vault (AppRole)
+      │   2. Read MySQL secrets
+      │   3. kubectl create secret
+      │   4. Build → Push → ArgoCD sync
+      │
+      │  ┌─── Internal NLB ───┐
+      ▼  ▼                    ▼
  ┌──────────────────────────────────────────────────────────┐
  │                    EKS Cluster                            │
  │  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐  │
  │  │  Vault   │  │  ArgoCD  │  │  namespace: demo-app    │  │
  │  │  (HA x3) │  │  App-of- │  │                          │  │
- │  │    ↓     │  │  Apps    │  │  ALB Ingress              │  │
- │  │   ESO    │  └──────────┘  │    ↓                      │  │
- │  │    ↓     │                │  Frontend (Rollout: B/G)   │  │
- │  │  Secret  │                │    ↓                      │  │
- │  └──────────┘                │  Backend (Rollout: Canary) │  │
- │                              │    ↓                      │  │
+ │  │  AppRole │  │  Apps    │  │  ALB Ingress              │  │
+ │  │  Auth ✅ │  └──────────┘  │    ↓                      │  │
+ │  │          │                │  Frontend (Rollout: B/G)   │  │
+ │  │  Secrets │                │    ↓                      │  │
+ │  │  KV v2   │                │  Backend (Rollout: Canary) │  │
+ │  └──────────┘                │    ↓                      │  │
  │                              │  MySQL 8.0 (StatefulSet)   │  │
  │                              │  PVC 5Gi gp3               │  │
+ │                              │  🔐 Secret: mysql-secret   │  │
+ │                              │     (created by Jenkins)   │  │
  │                              └──────────────────────────┘  │
  │  2 node c7i-flex.large                                     │
  └──────────────────────────────────────────────────────────┘
@@ -39,18 +47,21 @@ Developer push code → GitHub (Week-5-CICD)
     │
     ▼
 Jenkins Pipeline:
-  1. Verify Tools
+  1. Verify Tools (docker, vault, kubectl, trivy, ...)
   2. Checkout Code
   3. Docker Login
   4. Lint (Backend + Frontend)
   5. Test (Backend + Frontend)
   6. Build & Push (Backend + Frontend → Docker Hub)
   7. Trivy Security Scan
-  8. Update GitOps (sed tag → git push)
+  8. 🔐 Fetch Secrets from Vault (AppRole Auth → Read MySQL)
+  9. 🔧 Create K8s Secret (kubectl create secret → mysql-secret)
+ 10. Update GitOps (sed tag → git push)
     │
     ▼
 ArgoCD:
   Detect values.yaml change → Sync Wave 0→1→2 → App updated
+  MySQL + Backend reads mysql-secret (created by Jenkins)
 ```
 
 ## Tech Stack
@@ -66,7 +77,7 @@ ArgoCD:
 | Storage | EBS CSI Driver + gp3 |
 | GitOps CD | ArgoCD (App-of-Apps, Sync Wave, Hooks) |
 | Progressive Delivery | Argo Rollouts (Blue-Green + Canary) |
-| Secret Management | HashiCorp Vault (HA) + External Secrets Operator |
+| Secret Management | HashiCorp Vault (HA) – Jenkins AppRole Auth → kubectl create secret |
 | CI | Jenkins (self-hosted EC2) |
 | IaC | Terraform (S3 backend, multi-env) |
 | Config Mgmt | Ansible |
@@ -83,7 +94,7 @@ ArgoCD:
 │   ├── templates/             # K8s manifests + hooks + rollouts
 │   │   ├── rollout-backend.yaml   # Canary deployment
 │   │   ├── rollout-frontend.yaml  # Blue-Green deployment
-│   │   ├── externalsecret.yaml    # ESO sync Vault → K8s Secret
+│   │   ├── externalsecret.yaml    # (DEPRECATED) ESO – không dùng nữa
 │   │   └── hooks.yaml             # PreSync/PostSync/SyncFail
 │   └── manual/                # Secret templates (fallback)
 ├── infra/
@@ -144,13 +155,43 @@ kubectl get nodes
 
 ```bash
 # ===== Vault (Secret Management) =====
-# Init + unseal + store MySQL credentials (1 script)
+# Bước 1: Init + Unseal + Cấu hình Auth (chạy script)
 cd infra/vault
-cp vault.env.example vault.env   # Sửa password
 bash vault-init.sh
+# ↑ Script sẽ:
+#   1. Init Vault (5 key shares, 3 threshold)
+#   2. Unseal 3 pods + Join Raft cluster
+#   3. Enable KV v2 secrets engine
+#   4. Enable Kubernetes Auth (fallback)
+#   5. Enable AppRole Auth → hiển thị Role ID + Secret ID cho Jenkins
+#   6. Hiển thị Vault Internal NLB DNS
+#
+# ⚠️ LƯU Role ID & Secret ID! Sẽ cần cho Jenkins credentials.
+#
+# Bước 2: TẠO MYSQL SECRET BẰNG TAY (Vault UI hoặc CLI)
+#   → Mở Vault UI:
+kubectl port-forward -n vault svc/vault 8200:8200
+#   → http://localhost:8200 → Login Root Token
+#   → Vào secret/ → Create secret → Path: demo-app/mysql
+#   → Thêm 4 keys:
+#       root-password = <password thật>
+#       database      = full-stack-ecommerce
+#       username      = ecommerceapp
+#       password      = <password thật>
+#
+#   HOẶC dùng vault CLI (gõ trực tiếp, KHÔNG lưu vào file):
+#   vault kv put secret/demo-app/mysql \
+#     root-password='<password>' database='full-stack-ecommerce' \
+#     username='ecommerceapp' password='<password>'
+#
+# ⚠️ KHÔNG dùng file .env để tránh push nhầm plaintext password lên Git!
+# ⚠️ vault.env.example chỉ là template tham khảo, không dùng trong automation.
+
+# Lấy Vault NLB DNS
+kubectl get svc vault -n vault
+# → Copy NLB DNS, cập nhật vào Jenkinsfile: VAULT_ADDR
 
 # ===== ArgoCD App-of-Apps =====
-# Deploy dev-root → ArgoCD tự sync toàn bộ demo-app (DEV)
 kubectl apply -f argocd/app-of-apps/dev-root.yaml
 kubectl get pods -n demo-app -w
 
@@ -162,26 +203,16 @@ bash infra/scripts/install-tools.sh
 
 ```bash
 # ===== STAGING =====
-# Infrastructure (nếu cần cluster riêng)
 cd infra/envs/stg/compute
 terraform init && terraform apply -auto-approve
-
-# Deploy app → ArgoCD auto-sync
 kubectl apply -f argocd/app-of-apps/stg-root.yaml
 kubectl get pods -n demo-app-stg -w
 
 # ===== PRODUCTION =====
-# Infrastructure (nếu cần cluster riêng)
 cd infra/envs/prd/compute
 terraform init && terraform apply -auto-approve
-
-# Deploy app → ArgoCD auto-sync
 kubectl apply -f argocd/app-of-apps/prd-root.yaml
 kubectl get pods -n demo-app-prd -w
-
-# ⚠️ Vault secrets dùng chung cho mọi environment
-# ArgoCD sẽ tự deploy ExternalSecret ở namespace tương ứng
-# Vault role đã whitelist: demo-app, demo-app-stg, demo-app-prd
 ```
 
 ### 4. Jenkins EC2
@@ -197,10 +228,13 @@ cd ../../../ansible
 
 ### 5. Jenkins Credentials
 
-| ID | Kind |
-|----|------|
-| `dockerhub-credentials` | Username with password |
-| `github-token` | Secret text |
+| ID | Kind | Description |
+|----|------|-------------|
+| `dockerhub-credentials` | Username with password | Docker Hub login |
+| `github-token` | Secret text | GitHub PAT for git push |
+| `sonarqube-token` | Secret text | SonarQube analysis token |
+| `vault-role-id` | Secret text | 🔐 Vault AppRole Role ID (từ vault-init.sh output) |
+| `vault-secret-id` | Secret text | 🔐 Vault AppRole Secret ID (từ vault-init.sh output) |
 
 ### 6. Test CI/CD
 
@@ -218,7 +252,7 @@ git add -A && git commit -m "Test" && git push origin Week-5-CICD
 | ArgoCD Password | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
 | Argo Rollouts Dashboard | `kubectl argo rollouts dashboard` → http://localhost:3100 |
 | Vault UI | `kubectl port-forward -n vault svc/vault 8200:8200` → http://localhost:8200 |
-| Vault Token | `aws ssm get-parameter --name '/devops-lab/vault/root-token' --with-decryption --region us-east-1 --profile root-lab-2 --query 'Parameter.Value' --output text` |
+| Vault NLB | `kubectl get svc vault -n vault` → copy NLB DNS (Jenkins dùng) |
 | Jenkins | http://<JENKINS_EIP>:8080 |
 | Jenkins Password | `cat /var/jenkins_home/secrets/initialAdminPassword` (SSH vào EC2) |
 | Rancher | https://<RANCHER_EIP>.sslip.io |
@@ -229,36 +263,56 @@ git add -A && git commit -m "Test" && git push origin Week-5-CICD
 |---------|--------|
 | SG IP Whitelist | Jenkins + Rancher restricted to trusted IP only |
 | Image Scanning | Trivy HIGH + CRITICAL in every build |
-| Secret Mgmt | **HashiCorp Vault + ESO** — secrets never in Git, auto-sync to K8s |
+| Secret Mgmt | **HashiCorp Vault → Jenkins AppRole → kubectl create secret** — secrets never in Git |
 | Encryption | Vault encrypts at rest, AWS KMS for SSM & EKS |
 | GitOps Audit | All changes via Git history |
 
 > ⚠️ **Lesson:** Jenkins port 8080 open to internet → hacked within minutes → EC2 used for DDoS. **Fix:** IP whitelist in Security Group.
 
-## Vault Integration
+## Secret Management (Vault → Jenkins → K8s)
 
 ```
-  vault kv put (1 lần) → Vault (mã hóa) → ESO (auto sync) → K8s Secret → Pod
+┌─────────────────────────────────────────────────────────────┐
+│  SECRET FLOW (KHÔNG dùng ESO)                                │
+│                                                              │
+│  vault-init.sh (1 lần)                                       │
+│    │                                                         │
+│    ├─→ Vault: secret/demo-app/mysql                         │
+│    │     ├─ root-password                                   │
+│    │     ├─ database                                        │
+│    │     ├─ username                                        │
+│    │     └─ password                                        │
+│    │                                                         │
+│    └─→ Vault: AppRole "jenkins"                             │
+│          ├─ role-id    → Jenkins credential vault-role-id   │
+│          └─ secret-id  → Jenkins credential vault-secret-id │
+│                                                              │
+│  Jenkins Pipeline (mỗi lần build)                            │
+│    │                                                         │
+│    ├─ 1. vault write auth/approle/login (AppRole)           │
+│    ├─ 2. vault kv get secret/demo-app/mysql                 │
+│    └─ 3. kubectl create secret generic mysql-secret         │
+│                                                              │
+│  K8s Pods:                                                   │
+│    MySQL StatefulSet  ──── mysql-secret ──── env: MYSQL_*   │
+│    Backend Rollout    ──── mysql-secret ──── env: MYSQL_*   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 | Component | Role |
 |-----------|------|
-| **Vault** (3 pods, HA) | Lưu secrets mã hóa, audit log, phân quyền |
-| **ESO** (1 pod) | Đọc Vault → tạo K8s Secret tự động mỗi 1h |
-| **ExternalSecret** | Khai báo: "Vault path X → K8s Secret Y" |
-| **SecretStore** | Khai báo: "Kết nối Vault ở đâu, auth thế nào" |
-
-**Lợi ích:**
-- Đổi password: `vault kv patch` 1 lần → ESO tự sync 15 K8s Secrets
-- Audit: biết ai đọc secret lúc nào
-- Không còn `kubectl create secret` thủ công
+| **Vault** (3 pods, HA) | Lưu secrets mã hóa, AppRole auth cho Jenkins |
+| **Internal NLB** | Cho phép Jenkins EC2 (cùng VPC) gọi Vault qua private IP |
+| **AppRole** | Machine-to-machine auth: Jenkins dùng role-id + secret-id |
+| **Jenkins** | Auth Vault → đọc secret → tạo K8s Secret qua kubectl |
+| **mysql-secret** | K8s Secret được Jenkins tạo/quản lý (không qua ESO) |
 
 ## ArgoCD Features
 
 | Feature | Description |
 |---------|-------------|
 | App-of-Apps | 1 root app → auto-create all child apps |
-| Sync Wave | SecretStore (Wave -2) → ExternalSecret (Wave -1) → MySQL (Wave 0) → Backend (Wave 1) → Frontend+Ingress (Wave 2) |
+| Sync Wave | MySQL (Wave 0) → Backend (Wave 1) → Frontend+Ingress (Wave 2) |
 | PreSync Hook | Backup MySQL before deploy |
 | PostSync Hook | Health check after deploy |
 | SyncFail Hook | Alert on failure |
