@@ -184,14 +184,12 @@ pipeline {
         // ═══════════════════════════════════════════════════════════════════
         stage('4. Docker Login') {
             steps {
-                script {
-                    def vaultProps = readProperties file: 'vault-env.properties'
-                    sh """
-                        echo "→ Docker login with credentials from Vault..."
-                        echo "${vaultProps['DOCKERHUB_PASS']}" | docker login -u "${vaultProps['DOCKERHUB_USER']}" --password-stdin
-                        echo "✅ Docker login successful"
-                    """
-                }
+                sh '''
+                    set -a; source vault-env.properties; set +a
+                    echo "→ Docker login with credentials from Vault..."
+                    echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+                    echo "✅ Docker login successful"
+                '''
             }
         }
 
@@ -257,17 +255,15 @@ pipeline {
         stage('7. SonarQube Analysis') {
             when { expression { env.DEPLOY_BACKEND == 'true' } }
             steps {
-                script {
-                    def vaultProps = readProperties file: 'vault-env.properties'
-                    dir('src/02-backend_spring-boot-rest-api') {
-                        sh """
-                            chmod +x mvnw
-                            ./mvnw sonar:sonar \\
-                              -Dsonar.projectKey=\${PROJECT_NAME} \\
-                              -Dsonar.host.url=http://sonarqube:9000 \\
-                              -Dsonar.token=${vaultProps['SONARQUBE_TOKEN']}
-                        """
-                    }
+                dir('src/02-backend_spring-boot-rest-api') {
+                    sh '''
+                        set -a; source ../../vault-env.properties; set +a
+                        chmod +x mvnw
+                        ./mvnw sonar:sonar \
+                          -Dsonar.projectKey=${PROJECT_NAME} \
+                          -Dsonar.host.url=http://sonarqube:9000 \
+                          -Dsonar.token=${SONARQUBE_TOKEN}
+                    '''
                 }
             }
         }
@@ -353,32 +349,26 @@ pipeline {
         // ═══════════════════════════════════════════════════════════════════
         stage('10. 🔧 Create K8s Secrets') {
             steps {
-                script {
-                    // Load secrets từ file đã lưu ở Stage 3
-                    def vaultProps = readProperties file: 'vault-env.properties'
+                sh '''
+                    set -a; source vault-env.properties; set +a
+                    echo "=============================================="
+                    echo "  CREATE/UPDATE K8s SECRETS"
+                    echo "  Namespace: ${KUBE_NAMESPACE}"
+                    echo "=============================================="
 
-                    sh """
-                        echo "=============================================="
-                        echo "  CREATE/UPDATE K8s SECRETS"
-                        echo "  Namespace: ${KUBE_NAMESPACE}"
-                        echo "=============================================="
-                        
-                        # Đảm bảo namespace tồn tại
-                        kubectl create namespace ${KUBE_NAMESPACE} \
-                          --dry-run=client -o yaml | kubectl apply -f -
-                        
-                        # Tạo/update secret từ Vault values
-                        kubectl create secret generic mysql-secret \
-                          -n ${KUBE_NAMESPACE} \\
-                          --from-literal=mysql-root-password="${vaultProps['MYSQL_ROOT_PASSWORD']}" \\
-                          --from-literal=mysql-database="${vaultProps['MYSQL_DATABASE']}" \\
-                          --from-literal=mysql-user="${vaultProps['MYSQL_USER']}" \\
-                          --from-literal=mysql-password="${vaultProps['MYSQL_PASSWORD']}" \\
-                          --dry-run=client -o yaml | kubectl apply -f -
-                        
-                        echo "✅ mysql-secret ready in ${KUBE_NAMESPACE}"
-                    """
-                }
+                    kubectl create namespace ${KUBE_NAMESPACE} \
+                      --dry-run=client -o yaml | kubectl apply -f -
+
+                    kubectl create secret generic mysql-secret \
+                      -n ${KUBE_NAMESPACE} \
+                      --from-literal=mysql-root-password="${MYSQL_ROOT_PASSWORD}" \
+                      --from-literal=mysql-database="${MYSQL_DATABASE}" \
+                      --from-literal=mysql-user="${MYSQL_USER}" \
+                      --from-literal=mysql-password="${MYSQL_PASSWORD}" \
+                      --dry-run=client -o yaml | kubectl apply -f -
+
+                    echo "✅ mysql-secret ready in ${KUBE_NAMESPACE}"
+                '''
             }
         }
 
