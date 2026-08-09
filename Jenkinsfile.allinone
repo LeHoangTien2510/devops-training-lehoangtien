@@ -58,6 +58,8 @@ pipeline {
         // ─── Kubernetes ───
         string(name: 'KUBE_NAMESPACE', defaultValue: '',
                description: 'Namespace (để trống = PROJECT_NAME-ENVIRONMENT)')
+        string(name: 'KUBE_CONFIG_CRED', defaultValue: 'kubeconfig',
+               description: 'Jenkins credential ID chứa file kubeconfig (Secret file)')
     }
 
     // =========================================================================
@@ -349,26 +351,29 @@ pipeline {
         // ═══════════════════════════════════════════════════════════════════
         stage('10. 🔧 Create K8s Secrets') {
             steps {
-                sh '''
-                    set -a; . ${WORKSPACE}/vault-env.properties; set +a
-                    echo "=============================================="
-                    echo "  CREATE/UPDATE K8s SECRETS"
-                    echo "  Namespace: ${KUBE_NAMESPACE}"
-                    echo "=============================================="
+                withCredentials([file(credentialsId: params.KUBE_CONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                    sh '''
+                        export KUBECONFIG=${KUBECONFIG_FILE}
+                        set -a; . ${WORKSPACE}/vault-env.properties; set +a
+                        echo "=============================================="
+                        echo "  CREATE/UPDATE K8s SECRETS"
+                        echo "  Namespace: ${KUBE_NAMESPACE}"
+                        echo "=============================================="
 
-                    kubectl create namespace ${KUBE_NAMESPACE} \
-                      --dry-run=client -o yaml | kubectl apply -f -
+                        kubectl create namespace ${KUBE_NAMESPACE} \
+                          --dry-run=client -o yaml | kubectl apply -f -
 
-                    kubectl create secret generic mysql-secret \
-                      -n ${KUBE_NAMESPACE} \
-                      --from-literal=mysql-root-password="${MYSQL_ROOT_PASSWORD}" \
-                      --from-literal=mysql-database="${MYSQL_DATABASE}" \
-                      --from-literal=mysql-user="${MYSQL_USER}" \
-                      --from-literal=mysql-password="${MYSQL_PASSWORD}" \
-                      --dry-run=client -o yaml | kubectl apply -f -
+                        kubectl create secret generic mysql-secret \
+                          -n ${KUBE_NAMESPACE} \
+                          --from-literal=mysql-root-password="${MYSQL_ROOT_PASSWORD}" \
+                          --from-literal=mysql-database="${MYSQL_DATABASE}" \
+                          --from-literal=mysql-user="${MYSQL_USER}" \
+                          --from-literal=mysql-password="${MYSQL_PASSWORD}" \
+                          --dry-run=client -o yaml | kubectl apply -f -
 
-                    echo "✅ mysql-secret ready in ${KUBE_NAMESPACE}"
-                '''
+                        echo "✅ mysql-secret ready in ${KUBE_NAMESPACE}"
+                    '''
+                }
             }
         }
 
@@ -379,8 +384,9 @@ pipeline {
         // ═══════════════════════════════════════════════════════════════════
         stage('11. 🚀 Deploy to Cluster') {
             steps {
-                script {
-                    def deployScript = ""
+                withCredentials([file(credentialsId: params.KUBE_CONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                    script {
+                        def deployScript = "export KUBECONFIG=\${KUBECONFIG_FILE}\n"
 
                     if (env.DEPLOY_BACKEND == 'true') {
                         deployScript += """
@@ -444,16 +450,19 @@ pipeline {
     post {
         always {
             script {
-                // Hiển thị trạng thái pods sau deploy
-                sh """
-                    echo ""
-                    echo "=============================================="
-                    echo "  POD STATUS (${KUBE_NAMESPACE})"
-                    echo "=============================================="
-                    kubectl -n ${KUBE_NAMESPACE} get pods -o wide || true
-                    echo ""
-                    kubectl -n ${KUBE_NAMESPACE} get secrets | grep mysql || true
-                """
+                withCredentials([file(credentialsId: params.KUBE_CONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                    // Hiển thị trạng thái pods sau deploy
+                    sh """
+                        export KUBECONFIG=\${KUBECONFIG_FILE}
+                        echo ""
+                        echo "=============================================="
+                        echo "  POD STATUS (${KUBE_NAMESPACE})"
+                        echo "=============================================="
+                        kubectl -n ${KUBE_NAMESPACE} get pods -o wide || true
+                        echo ""
+                        kubectl -n ${KUBE_NAMESPACE} get secrets | grep mysql || true
+                    """
+                }
                 // Dọn file tạm
                 sh 'rm -f vault-env.properties'
             }
