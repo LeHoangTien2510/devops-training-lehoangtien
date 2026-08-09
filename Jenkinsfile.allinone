@@ -439,9 +439,10 @@ pipeline {
                     } else {
                         echo "⚠️  MODULE_DEPLOY empty – nothing to deploy"
                     }
-                }
-            }
-        }
+                    }  // script
+                }  // withCredentials
+            }  // steps
+        }  // stage
     }
 
     // =========================================================================
