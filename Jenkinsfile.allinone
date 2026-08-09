@@ -378,7 +378,7 @@ pipeline {
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // STAGE 11: Deploy – kubectl argo rollouts set image
+        // STAGE 11: Deploy – kubectl argo rollouts set image --insecure-skip-tls-verify
         //           Argo Rollouts controller xử lý Canary/Blue-Green
         //           (Rollout vẫn hoạt động độc lập, không cần ArgoCD)
         // ═══════════════════════════════════════════════════════════════════
@@ -396,12 +396,12 @@ pipeline {
                             echo "=============================================="
                             
                             # Argo Rollouts set image – rollouts controller tự canary
-                            kubectl argo rollouts set image ecommerce-backend \\
+                            kubectl argo rollouts set image --insecure-skip-tls-verify ecommerce-backend \\
                               backend=${params.DOCKER_BACKEND_REPO}:${IMAGE_TAG} \\
                               -n ${KUBE_NAMESPACE}
                             
                             # Đợi rollout hoàn tất (canary qua các bước)
-                            kubectl argo rollouts status ecommerce-backend \\
+                            kubectl argo rollouts status --insecure-skip-tls-verify ecommerce-backend \\
                               -n ${KUBE_NAMESPACE} --timeout 10m
                             
                             echo "✅ Backend deployed: ${params.DOCKER_BACKEND_REPO}:${IMAGE_TAG}"
@@ -416,18 +416,18 @@ pipeline {
                             echo "=============================================="
                             
                             # Argo Rollouts set image – Blue-Green: tạo stack mới
-                            kubectl argo rollouts set image ecommerce-frontend \\
+                            kubectl argo rollouts set image --insecure-skip-tls-verify ecommerce-frontend \\
                               frontend=${params.DOCKER_FRONTEND_REPO}:${IMAGE_TAG} \\
                               -n ${KUBE_NAMESPACE}
                             
                             echo "⚠️  Blue-Green: cần promote thủ công hoặc tự động"
-                            echo "   kubectl argo rollouts promote ecommerce-frontend -n ${KUBE_NAMESPACE}"
+                            echo "   kubectl argo rollouts promote --insecure-skip-tls-verify ecommerce-frontend -n ${KUBE_NAMESPACE}"
                             
                             # Nếu autoPromotionEnabled=true thì tự promote, nếu không thì pause
-                            kubectl argo rollouts promote ecommerce-frontend \\
+                            kubectl argo rollouts promote --insecure-skip-tls-verify ecommerce-frontend \\
                               -n ${KUBE_NAMESPACE} 2>/dev/null || echo "   (auto-promote disabled – promote manually)"
                             
-                            kubectl argo rollouts status ecommerce-frontend \\
+                            kubectl argo rollouts status --insecure-skip-tls-verify ecommerce-frontend \\
                               -n ${KUBE_NAMESPACE} --timeout 5m
                             
                             echo "✅ Frontend deployed: ${params.DOCKER_FRONTEND_REPO}:${IMAGE_TAG}"
@@ -459,9 +459,9 @@ pipeline {
                         echo "=============================================="
                         echo "  POD STATUS (${KUBE_NAMESPACE})"
                         echo "=============================================="
-                        kubectl -n ${KUBE_NAMESPACE} get pods -o wide || true
+                        kubectl -n ${KUBE_NAMESPACE} get pods -o wide --validate=false || true
                         echo ""
-                        kubectl -n ${KUBE_NAMESPACE} get secrets | grep mysql || true
+                        kubectl -n ${KUBE_NAMESPACE} get secrets --validate=false | grep mysql || true
                     """
                 }
                 // Dọn file tạm
