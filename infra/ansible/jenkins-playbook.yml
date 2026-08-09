@@ -218,6 +218,20 @@
       debug:
         msg: "{{ kubeconfig_copy.stdout }}"
 
+    # ─── Copy AWS credentials cho kubectl EKS auth ───
+    - name: Copy AWS credentials vào Jenkins container
+      shell: |
+        docker exec -u root jenkins mkdir -p /var/jenkins_home/.aws
+        if [ -f ~/.aws/credentials ]; then
+          docker cp ~/.aws/credentials jenkins:/var/jenkins_home/.aws/credentials
+          docker exec -u root jenkins chown -R jenkins:jenkins /var/jenkins_home/.aws
+          echo "✅ AWS credentials copied"
+        else
+          echo "⚠️  ~/.aws/credentials not found – skip"
+        fi
+      register: aws_creds_copy
+      changed_when: false
+
     - name: Lấy Jenkins initial admin password
       command: cat {{ jenkins_home }}/secrets/initialAdminPassword
       register: admin_password

@@ -361,7 +361,7 @@ pipeline {
                         echo "=============================================="
 
                         kubectl create namespace ${KUBE_NAMESPACE} \
-                          --dry-run=client -o yaml | kubectl apply -f -
+                          --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
                         kubectl create secret generic mysql-secret \
                           -n ${KUBE_NAMESPACE} \
@@ -369,7 +369,7 @@ pipeline {
                           --from-literal=mysql-database="${MYSQL_DATABASE}" \
                           --from-literal=mysql-user="${MYSQL_USER}" \
                           --from-literal=mysql-password="${MYSQL_PASSWORD}" \
-                          --dry-run=client -o yaml | kubectl apply -f -
+                          --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
                         echo "✅ mysql-secret ready in ${KUBE_NAMESPACE}"
                     '''
