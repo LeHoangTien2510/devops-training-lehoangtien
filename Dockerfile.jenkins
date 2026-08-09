@@ -30,6 +30,11 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
     && rm kubectl
 
+# ---------- Cài kubectl-argo-rollouts plugin ----------
+RUN curl -sLO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 \
+    && chmod +x kubectl-argo-rollouts-linux-amd64 \
+    && mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+
 # ---------- Cài HashiCorp Vault CLI ----------
 RUN apt-get update && apt-get install -y gnupg curl unzip \
     && VAULT_VERSION=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/vault | grep -o '"current_version":"[^"]*"' | cut -d'"' -f4) \

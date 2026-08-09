@@ -119,19 +119,6 @@
         mode: "0755"
 
     # ============================================================
-    # 3. TẠO DOCKER NETWORK CHO JENKINS + SONARQUBE
-    # ============================================================
-    - name: Tạo Docker network jenkins-net
-      command: docker network create jenkins-net
-      register: network_result
-      changed_when: "'already exists' not in network_result.stderr and network_result.rc != 0"
-      ignore_errors: true
-
-    - name: Hiển thị trạng thái network
-      debug:
-        msg: "🌐 Docker network 'jenkins-net': {{ 'đã tồn tại' if network_result.rc != 0 else 'đã tạo mới' }}"
-
-    # ============================================================
     # 4. BUILD JENKINS IMAGE (CUSTOM)
     # ============================================================
     - name: Copy Dockerfile.jenkins lên server

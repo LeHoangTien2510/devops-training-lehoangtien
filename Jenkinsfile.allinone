@@ -420,12 +420,16 @@ pipeline {
                               frontend=${params.DOCKER_FRONTEND_REPO}:${IMAGE_TAG} \\
                               -n ${KUBE_NAMESPACE}
                             
-                            echo "⚠️  Blue-Green: cần promote thủ công hoặc tự động"
-                            echo "   kubectl argo rollouts promote --insecure-skip-tls-verify ecommerce-frontend -n ${KUBE_NAMESPACE}"
+                            echo "⚠️  Blue-Green: promote lần 1 (cutover preview)..."
                             
-                            # Nếu autoPromotionEnabled=true thì tự promote, nếu không thì pause
                             kubectl argo rollouts promote --insecure-skip-tls-verify ecommerce-frontend \\
-                              -n ${KUBE_NAMESPACE} 2>/dev/null || echo "   (auto-promote disabled – promote manually)"
+                              -n ${KUBE_NAMESPACE}
+                            
+                            sleep 30
+                            
+                            echo "⚠️  Blue-Green: promote lần 2 (finalize)..."
+                            kubectl argo rollouts promote --insecure-skip-tls-verify ecommerce-frontend \\
+                              -n ${KUBE_NAMESPACE} 2>/dev/null || echo "   (chỉ cần 1 promote)"
                             
                             kubectl argo rollouts status --insecure-skip-tls-verify ecommerce-frontend \\
                               -n ${KUBE_NAMESPACE} --timeout 5m
