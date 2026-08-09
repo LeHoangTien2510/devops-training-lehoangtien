@@ -71,6 +71,9 @@ serviceMonitor:
   enabled: true
   interval: 30s
 
+monitoring:
+  enabled: true
+
 certManager:
   enabled: false
   issuerName: selfsigned-issuer

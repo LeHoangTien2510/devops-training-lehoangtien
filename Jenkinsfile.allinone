@@ -185,7 +185,7 @@ pipeline {
         stage('4. Docker Login') {
             steps {
                 sh '''
-                    set -a; source vault-env.properties; set +a
+                    set -a; . vault-env.properties; set +a
                     echo "→ Docker login with credentials from Vault..."
                     echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
                     echo "✅ Docker login successful"
@@ -257,7 +257,7 @@ pipeline {
             steps {
                 dir('src/02-backend_spring-boot-rest-api') {
                     sh '''
-                        set -a; source ../../vault-env.properties; set +a
+                        set -a; . ../../vault-env.properties; set +a
                         chmod +x mvnw
                         ./mvnw sonar:sonar \
                           -Dsonar.projectKey=${PROJECT_NAME} \
@@ -350,7 +350,7 @@ pipeline {
         stage('10. 🔧 Create K8s Secrets') {
             steps {
                 sh '''
-                    set -a; source vault-env.properties; set +a
+                    set -a; . vault-env.properties; set +a
                     echo "=============================================="
                     echo "  CREATE/UPDATE K8s SECRETS"
                     echo "  Namespace: ${KUBE_NAMESPACE}"
