@@ -158,15 +158,13 @@
       ignore_errors: true
       changed_when: false
 
-    - name: Chạy Jenkins container
+    - name: Chạy Jenkins container (host network – để với được EKS private endpoint)
       command: >
         docker run -d
         --name {{ jenkins_container_name }}
         --restart unless-stopped
-        --network jenkins-net
+        --network host
         --group-add {{ docker_host_gid }}
-        -p {{ jenkins_host_port }}:8080
-        -p {{ jenkins_jnlp_port }}:50000
         -v {{ jenkins_home }}:/var/jenkins_home
         -v /var/run/docker.sock:/var/run/docker.sock
         -e JAVA_OPTS="-Djenkins.install.runSetupWizard=true"
@@ -181,13 +179,12 @@
       ignore_errors: true
       changed_when: false
 
-    - name: Chạy SonarQube container
+    - name: Chạy SonarQube container (host network – cùng host với Jenkins)
       command: >
         docker run -d
         --name sonarqube
         --restart unless-stopped
-        --network jenkins-net
-        -p 9000:9000
+        --network host
         -v sonarqube_data:/opt/sonarqube/data
         -v sonarqube_extensions:/opt/sonarqube/extensions
         sonarqube:community

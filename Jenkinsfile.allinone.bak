@@ -1,0 +1,493 @@
+// =============================================================================
+// Jenkinsfile – All-in-One CI/CD Pipeline (mentor style: Push CD)
+//
+// TRIẾT LÝ:
+//   1 job duy nhất → mọi project, mọi môi trường, mọi component
+//   Vault là nguồn sự thật DUY NHẤT cho TOÀN BỘ config & secrets
+//   Jenkins chỉ giữ 1 credential: vault-token. Mọi thứ khác đều từ Vault.
+//
+// FLOW MỖI LẦN CHẠY:
+//   vault login → đọc registry → docker login
+//   vault login → đọc sonarqube → sonar analysis
+//   vault login → đọc mysql → kubectl create secret
+//   Build + Push → kubectl set image → xong
+//
+// ⚠️  ARGOCD: Nếu vẫn dùng ArgoCD cho resource này, phải TẮT selfHeal
+//     HOẶC thêm annotation: argocd.argoproj.io/compare-options: IgnoreExtraneous
+//
+// JENKINS CREDENTIALS (CHỈ 1):
+//   + vault-token  (secret text – lấy từ vault-init.sh)
+//
+// VAULT STRUCTURE (tất cả secrets nằm trong Vault):
+//   secret/common/registry   → dockerhub_user, dockerhub_password
+//   secret/common/tools      → sonarqube_token
+//   secret/demo-app/mysql    → root-password, database, username, password
+//
+// YÊU CẦU TRÊN JENKINS CONTAINER: Docker CLI, Trivy, Git, Java, Maven, kubectl, Vault CLI
+// =============================================================================
+pipeline {
+    agent any
+
+    // =========================================================================
+    // PARAMETERS – Thay đổi mỗi lần chạy cho từng project/mtrg/component
+    // =========================================================================
+    parameters {
+        // ─── Project & Environment ───
+        string(name: 'PROJECT_NAME',  defaultValue: 'demo-app', description: 'Tên project (demo-app)')
+        choice(name: 'ENVIRONMENT',   choices: ['dev', 'stg', 'prd'], description: 'Môi trường deploy')
+        string(name: 'GIT_BRANCH',    defaultValue: 'Week-8-CI-full', description: 'Branch source code')
+
+        // ─── Module selection (giống mentor: chọn component cần deploy) ───
+        string(name: 'MODULE_DEPLOY', defaultValue: 'backend,frontend',
+               description: 'Module cần build+deploy (backend,frontend hoặc cả 2)')
+
+        // ─── Docker Registry ───
+        string(name: 'DOCKER_BACKEND_REPO', defaultValue: 'lehoangtien2510/ecommerce-backend',
+               description: 'Docker Hub repo cho backend')
+        string(name: 'DOCKER_FRONTEND_REPO', defaultValue: 'lehoangtien2510/ecommerce-frontend',
+               description: 'Docker Hub repo cho frontend')
+
+        // ─── Vault Configuration ───
+        string(name: 'VAULT_ADDR',     defaultValue: 'http://k8s-vault-vault-978d573894-0c92ff37df2c445c.elb.us-east-1.amazonaws.com:8200',
+               description: 'Vault Internal NLB URL (cùng VPC với Jenkins)')
+        string(name: 'VAULT_APP_PATH', defaultValue: 'secret/demo-app/mysql',
+               description: 'Vault path cho app secrets (MySQL, API keys...)')
+        string(name: 'VAULT_COMMON_PATH', defaultValue: 'secret/common',
+               description: 'Vault path cho common secrets (registry, tools, git...)')
+
+        // ─── Kubernetes ───
+        string(name: 'KUBE_NAMESPACE', defaultValue: '',
+               description: 'Namespace (để trống = PROJECT_NAME-ENVIRONMENT)')
+        string(name: 'KUBE_CONFIG_CRED', defaultValue: 'kubeconfig',
+               description: 'Jenkins credential ID chứa file kubeconfig (Secret file)')
+    }
+
+    // =========================================================================
+    // ENVIRONMENT – Biến toàn cục tính toán từ parameters
+    // =========================================================================
+    environment {
+        // Namespace: demo-app-dev, demo-app-stg, demo-app-prd
+        KUBE_NAMESPACE = "${params.KUBE_NAMESPACE ?: params.PROJECT_NAME + '-' + params.ENVIRONMENT}"
+
+        // Image tag = git commit short hash
+        IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+
+        // Module flags
+        DEPLOY_BACKEND  = "${params.MODULE_DEPLOY.contains('backend')}"
+        DEPLOY_FRONTEND = "${params.MODULE_DEPLOY.contains('frontend')}"
+    }
+
+    stages {
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 1: Verify Tools
+        // ═══════════════════════════════════════════════════════════════════
+        stage('1. Verify Tools') {
+            steps {
+                sh '''
+                    echo "=============================================="
+                    echo "  VERIFY TOOLS"
+                    echo "=============================================="
+                    echo ""
+                    echo "Project:     ${PROJECT_NAME}"
+                    echo "Environment: ${ENVIRONMENT}"
+                    echo "Namespace:   ${KUBE_NAMESPACE}"
+                    echo "Modules:     ${MODULE_DEPLOY}"
+                    echo "Image Tag:   ${IMAGE_TAG}"
+                    echo "Vault:       ${VAULT_ADDR}"
+                    echo ""
+                    docker --version    || exit 1
+                    docker info --format 'Docker Server: {{.ServerVersion}}' || true
+                    trivy --version     || echo "⚠️  Trivy not installed"
+                    git --version
+                    vault version       || echo "⚠️  Vault CLI not installed"
+                    kubectl version --client --short 2>/dev/null || kubectl version --client || echo "⚠️  kubectl"
+                    java -version 2>&1  || true
+                    mvn --version 2>&1  || echo "⚠️  Maven wrapper will be used"
+                    echo ""
+                    echo "✅ All tools verified"
+                '''
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 2: Checkout Source Code
+        // ═══════════════════════════════════════════════════════════════════
+        stage('2. Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 3: Get ALL Secrets from Vault
+        //           Đọc: Registry + SonarQube + MySQL → TẤT CẢ từ Vault
+        //           Jenkins CHỈ giữ 1 credential: vault-token
+        // ═══════════════════════════════════════════════════════════════════
+        stage('3. 🔐 Get ALL Secrets from Vault') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'vault-token', variable: 'VAULT_TOKEN')]) {
+                        sh '''
+                            echo "=============================================="
+                            echo "  GET ALL SECRETS FROM VAULT"
+                            echo "  (Registry + SonarQube + MySQL)"
+                            echo "=============================================="
+
+                            # ─── Login Vault (1 lần duy nhất) ───
+                            vault login -no-print -address=${VAULT_ADDR} ${VAULT_TOKEN}
+                            vault status -address=${VAULT_ADDR} | head -3
+
+                            # ═══════════════════════════════════════════════
+                            # 1. Đọc Docker Hub credentials từ Vault
+                            # ═══════════════════════════════════════════════
+                            echo ""
+                            echo "→ [1/3] Reading Registry credentials..."
+                            DOCKERHUB_USER=$(vault kv get -field=dockerhub_user -address=${VAULT_ADDR} ${VAULT_COMMON_PATH}/registry 2>/dev/null || echo "")
+                            DOCKERHUB_PASS=$(vault kv get -field=dockerhub_password -address=${VAULT_ADDR} ${VAULT_COMMON_PATH}/registry 2>/dev/null || echo "")
+
+                            # ═══════════════════════════════════════════════
+                            # 2. Đọc SonarQube token từ Vault
+                            # ═══════════════════════════════════════════════
+                            echo "→ [2/3] Reading SonarQube token..."
+                            SONARQUBE_TOKEN=$(vault kv get -field=sonarqube_token -address=${VAULT_ADDR} ${VAULT_COMMON_PATH}/tools 2>/dev/null || echo "")
+
+                            # ═══════════════════════════════════════════════
+                            # 3. Đọc MySQL credentials từ Vault (project-specific)
+                            # ═══════════════════════════════════════════════
+                            echo "→ [3/3] Reading MySQL secrets from ${VAULT_APP_PATH}..."
+                            MYSQL_ROOT_PASSWORD=$(vault kv get -field=root-password -address=${VAULT_ADDR} ${VAULT_APP_PATH})
+                            MYSQL_DATABASE=$(vault kv get -field=database -address=${VAULT_ADDR} ${VAULT_APP_PATH})
+                            MYSQL_USER=$(vault kv get -field=username -address=${VAULT_ADDR} ${VAULT_APP_PATH})
+                            MYSQL_PASSWORD=$(vault kv get -field=password -address=${VAULT_ADDR} ${VAULT_APP_PATH})
+
+                            # ─── Ghi tất cả ra file properties cho các stage sau dùng ───
+                            echo "DOCKERHUB_USER=${DOCKERHUB_USER}"           >  vault-env.properties
+                            echo "DOCKERHUB_PASS=${DOCKERHUB_PASS}"           >> vault-env.properties
+                            echo "SONARQUBE_TOKEN=${SONARQUBE_TOKEN}"         >> vault-env.properties
+                            echo "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}" >> vault-env.properties
+                            echo "MYSQL_DATABASE=${MYSQL_DATABASE}"           >> vault-env.properties
+                            echo "MYSQL_USER=${MYSQL_USER}"                   >> vault-env.properties
+                            echo "MYSQL_PASSWORD=${MYSQL_PASSWORD}"           >> vault-env.properties
+
+                            echo ""
+                            echo "✅ ALL secrets loaded from Vault"
+                            echo "   Registry:  ${DOCKERHUB_USER:-⚠️  NOT SET}"
+                            echo "   SonarQube: ${SONARQUBE_TOKEN:+✅ SET}"
+                            echo "   MySQL DB:  ${MYSQL_DATABASE}"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 4: Docker Login (credentials từ Vault, không từ Jenkins)
+        // ═══════════════════════════════════════════════════════════════════
+        stage('4. Docker Login') {
+            steps {
+                sh '''
+                    set -a; . ${WORKSPACE}/vault-env.properties; set +a
+                    echo "→ Docker login with credentials from Vault..."
+                    echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+                    echo "✅ Docker login successful"
+                '''
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 5: Lint (conditional theo MODULE_DEPLOY)
+        // ═══════════════════════════════════════════════════════════════════
+        stage('5. Lint') {
+            parallel {
+                stage('Lint Backend') {
+                    when { expression { env.DEPLOY_BACKEND == 'true' } }
+                    steps {
+                        dir('src/02-backend_spring-boot-rest-api') {
+                            sh 'chmod +x mvnw && ./mvnw checkstyle:check -Dcheckstyle.skip=false || true'
+                        }
+                    }
+                }
+                stage('Lint Frontend') {
+                    when { expression { env.DEPLOY_FRONTEND == 'true' } }
+                    steps {
+                        dir('src/03-frontend_angular-ecommerce') {
+                            sh '''
+                                docker run --rm --memory=1g --memory-swap=1g \
+                                  -v $(pwd):/app -w /app node:18-alpine \
+                                  sh -c "npm install && npx ng lint --fix" || true
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 6: Test (conditional theo MODULE_DEPLOY)
+        // ═══════════════════════════════════════════════════════════════════
+        stage('6. Test') {
+            parallel {
+                stage('Test Backend') {
+                    when { expression { env.DEPLOY_BACKEND == 'true' } }
+                    steps {
+                        dir('src/02-backend_spring-boot-rest-api') {
+                            sh 'chmod +x mvnw && ./mvnw test jacoco:report'
+                        }
+                    }
+                }
+                stage('Test Frontend') {
+                    when { expression { env.DEPLOY_FRONTEND == 'true' } }
+                    steps {
+                        dir('src/03-frontend_angular-ecommerce') {
+                            sh '''
+                                docker run --rm --memory=1g --memory-swap=1g \
+                                  -v $(pwd):/app -w /app node:18-alpine \
+                                  sh -c "npm install && npx ng test --watch=false --browsers=ChromeHeadlessNoSandbox" || true
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 7: SonarQube Analysis (token từ Vault, không từ Jenkins credential)
+        // ═══════════════════════════════════════════════════════════════════
+        stage('7. SonarQube Analysis') {
+            when { expression { env.DEPLOY_BACKEND == 'true' } }
+            steps {
+                dir('src/02-backend_spring-boot-rest-api') {
+                    sh '''
+                        set -a; . ${WORKSPACE}/vault-env.properties; set +a
+                        chmod +x mvnw
+                        ./mvnw sonar:sonar \
+                          -Dsonar.projectKey=${PROJECT_NAME} \
+                          -Dsonar.host.url=http://sonarqube:9000 \
+                          -Dsonar.token=${SONARQUBE_TOKEN}
+                    '''
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 8: Build & Push Docker Images (conditional)
+        // ═══════════════════════════════════════════════════════════════════
+        stage('8. Build & Push Images') {
+            parallel {
+                stage('Build Backend') {
+                    when { expression { env.DEPLOY_BACKEND == 'true' } }
+                    steps {
+                        dir('src/02-backend_spring-boot-rest-api') {
+                            sh '''
+                                echo "→ Building backend: ${DOCKER_BACKEND_REPO}:${IMAGE_TAG}"
+                                docker build \
+                                  -t ${DOCKER_BACKEND_REPO}:${IMAGE_TAG} \
+                                  -t ${DOCKER_BACKEND_REPO}:latest \
+                                  .
+                                docker push ${DOCKER_BACKEND_REPO}:${IMAGE_TAG}
+                                docker push ${DOCKER_BACKEND_REPO}:latest
+                                echo "✅ Backend image pushed: ${DOCKER_BACKEND_REPO}:${IMAGE_TAG}"
+                            '''
+                        }
+                    }
+                }
+                stage('Build Frontend') {
+                    when { expression { env.DEPLOY_FRONTEND == 'true' } }
+                    steps {
+                        dir('src/03-frontend_angular-ecommerce') {
+                            sh '''
+                                echo "→ Building frontend: ${DOCKER_FRONTEND_REPO}:${IMAGE_TAG}"
+                                docker build \
+                                  -t ${DOCKER_FRONTEND_REPO}:${IMAGE_TAG} \
+                                  -t ${DOCKER_FRONTEND_REPO}:latest \
+                                  .
+                                docker push ${DOCKER_FRONTEND_REPO}:${IMAGE_TAG}
+                                docker push ${DOCKER_FRONTEND_REPO}:latest
+                                echo "✅ Frontend image pushed: ${DOCKER_FRONTEND_REPO}:${IMAGE_TAG}"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 9: Trivy Security Scan
+        // ═══════════════════════════════════════════════════════════════════
+        stage('9. Trivy Scan') {
+            parallel {
+                stage('Scan Backend') {
+                    when { expression { env.DEPLOY_BACKEND == 'true' } }
+                    steps {
+                        sh '''
+                            if command -v trivy &>/dev/null; then
+                                echo "→ Scanning backend image..."
+                                trivy image --severity HIGH,CRITICAL \
+                                  ${DOCKER_BACKEND_REPO}:${IMAGE_TAG} \
+                                  || echo "## WARNING: Vulnerabilities found!"
+                            fi
+                        '''
+                    }
+                }
+                stage('Scan Frontend') {
+                    when { expression { env.DEPLOY_FRONTEND == 'true' } }
+                    steps {
+                        sh '''
+                            if command -v trivy &>/dev/null; then
+                                echo "→ Scanning frontend image..."
+                                trivy image --severity HIGH,CRITICAL \
+                                  ${DOCKER_FRONTEND_REPO}:${IMAGE_TAG} \
+                                  || echo "## WARNING: Vulnerabilities found!"
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 10: Create/Update K8s Secrets (từ file vault-env.properties)
+        // ═══════════════════════════════════════════════════════════════════
+        stage('10. 🔧 Create K8s Secrets') {
+            steps {
+                withCredentials([file(credentialsId: params.KUBE_CONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                    sh '''
+                        export KUBECONFIG=${KUBECONFIG_FILE}
+                        set -a; . ${WORKSPACE}/vault-env.properties; set +a
+                        echo "=============================================="
+                        echo "  CREATE/UPDATE K8s SECRETS"
+                        echo "  Namespace: ${KUBE_NAMESPACE}"
+                        echo "=============================================="
+
+                        kubectl create namespace ${KUBE_NAMESPACE} \
+                          --dry-run=client -o yaml | kubectl apply --validate=false -f -
+
+                        kubectl create secret generic mysql-secret \
+                          -n ${KUBE_NAMESPACE} \
+                          --from-literal=mysql-root-password="${MYSQL_ROOT_PASSWORD}" \
+                          --from-literal=mysql-database="${MYSQL_DATABASE}" \
+                          --from-literal=mysql-user="${MYSQL_USER}" \
+                          --from-literal=mysql-password="${MYSQL_PASSWORD}" \
+                          --dry-run=client -o yaml | kubectl apply --validate=false -f -
+
+                        echo "✅ mysql-secret ready in ${KUBE_NAMESPACE}"
+                    '''
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 11: Deploy – kubectl argo rollouts set image --insecure-skip-tls-verify
+        //           Argo Rollouts controller xử lý Canary/Blue-Green
+        //           (Rollout vẫn hoạt động độc lập, không cần ArgoCD)
+        // ═══════════════════════════════════════════════════════════════════
+        stage('11. 🚀 Deploy to Cluster') {
+            steps {
+                withCredentials([file(credentialsId: params.KUBE_CONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                    script {
+                        def deployScript = "export KUBECONFIG=\${KUBECONFIG_FILE}\n"
+
+                    if (env.DEPLOY_BACKEND == 'true') {
+                        deployScript += """
+                            echo "=============================================="
+                            echo "  DEPLOY BACKEND (Canary: 10%→50%→100%)"
+                            echo "  Image: ${params.DOCKER_BACKEND_REPO}:${IMAGE_TAG}"
+                            echo "=============================================="
+                            
+                            # Argo Rollouts set image – rollouts controller tự canary
+                            kubectl argo rollouts set image --insecure-skip-tls-verify ecommerce-backend \\
+                              backend=${params.DOCKER_BACKEND_REPO}:${IMAGE_TAG} \\
+                              -n ${KUBE_NAMESPACE}
+                            
+                            # Đợi rollout hoàn tất (canary qua các bước)
+                            kubectl argo rollouts status --insecure-skip-tls-verify ecommerce-backend \\
+                              -n ${KUBE_NAMESPACE} --timeout 10m
+                            
+                            echo "✅ Backend deployed: ${params.DOCKER_BACKEND_REPO}:${IMAGE_TAG}"
+                        """
+                    }
+
+                    if (env.DEPLOY_FRONTEND == 'true') {
+                        deployScript += """
+                            echo "=============================================="
+                            echo "  DEPLOY FRONTEND (Blue-Green: manual promote)"
+                            echo "  Image: ${params.DOCKER_FRONTEND_REPO}:${IMAGE_TAG}"
+                            echo "=============================================="
+                            
+                            # Argo Rollouts set image – Blue-Green: tạo stack mới
+                            kubectl argo rollouts set image --insecure-skip-tls-verify ecommerce-frontend \\
+                              frontend=${params.DOCKER_FRONTEND_REPO}:${IMAGE_TAG} \\
+                              -n ${KUBE_NAMESPACE}
+                            
+                            echo "⚠️  Blue-Green: cần promote thủ công hoặc tự động"
+                            echo "   kubectl argo rollouts promote --insecure-skip-tls-verify ecommerce-frontend -n ${KUBE_NAMESPACE}"
+                            
+                            # Nếu autoPromotionEnabled=true thì tự promote, nếu không thì pause
+                            kubectl argo rollouts promote --insecure-skip-tls-verify ecommerce-frontend \\
+                              -n ${KUBE_NAMESPACE} 2>/dev/null || echo "   (auto-promote disabled – promote manually)"
+                            
+                            kubectl argo rollouts status --insecure-skip-tls-verify ecommerce-frontend \\
+                              -n ${KUBE_NAMESPACE} --timeout 5m
+                            
+                            echo "✅ Frontend deployed: ${params.DOCKER_FRONTEND_REPO}:${IMAGE_TAG}"
+                        """
+                    }
+
+                    if (deployScript) {
+                        sh deployScript
+                    } else {
+                        echo "⚠️  MODULE_DEPLOY empty – nothing to deploy"
+                    }
+                    }  // script
+                }  // withCredentials
+            }  // steps
+        }  // stage
+    }
+
+    // =========================================================================
+    // POST ACTIONS
+    // =========================================================================
+    post {
+        always {
+            script {
+                withCredentials([file(credentialsId: params.KUBE_CONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                    // Hiển thị trạng thái pods sau deploy
+                    sh """
+                        export KUBECONFIG=\${KUBECONFIG_FILE}
+                        echo ""
+                        echo "=============================================="
+                        echo "  POD STATUS (${KUBE_NAMESPACE})"
+                        echo "=============================================="
+                        kubectl -n ${KUBE_NAMESPACE} get pods -o wide --validate=false || true
+                        echo ""
+                        kubectl -n ${KUBE_NAMESPACE} get secrets --validate=false | grep mysql || true
+                    """
+                }
+                // Dọn file tạm
+                sh 'rm -f vault-env.properties'
+            }
+        }
+        success {
+            echo """
+                ╔══════════════════════════════════════════╗
+                ║  ✅ DEPLOY THÀNH CÔNG!                   ║
+                ║                                          ║
+                ║  Project:     ${params.PROJECT_NAME}     ║
+                ║  Environment: ${params.ENVIRONMENT}      ║
+                ║  Namespace:   ${KUBE_NAMESPACE}          ║
+                ║  Image Tag:   ${IMAGE_TAG}               ║
+                ║  Modules:     ${params.MODULE_DEPLOY}    ║
+                ╚══════════════════════════════════════════╝
+            """
+        }
+        failure {
+            echo """
+                ╔══════════════════════════════════════════╗
+                ║  ❌ DEPLOY THẤT BẠI!                     ║
+                ║  Check console log for details          ║
+                ╚══════════════════════════════════════════╝
+            """
+        }
+    }
+}
