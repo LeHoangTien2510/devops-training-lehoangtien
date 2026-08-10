@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<!-- =============================================================================
+  IaC All-in-One – Simple Web UI
+  Mở bằng browser:   file:///.../platform/iac-ui/index.html
+  Hoặc serve bằng:    python3 -m http.server 8080
+  Backend API phải đang chạy: python3 platform/iac-backend/server.py
+  ============================================================================= -->
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏗️ IaC All-in-One</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card: #16213e;
+            --primary: #0f3460;
+            --accent: #e94560;
+            --green: #00c853;
+            --text: #e0e0e0;
+            --text-dim: #888;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container { max-width: 800px; width: 100%; }
+        h1 { text-align: center; margin-bottom: 8px; font-size: 2em; }
+        .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 30px; }
+
+        .step { 
+            background: var(--card); 
+            border-radius: 12px; 
+            padding: 24px; 
+            margin-bottom: 20px;
+            border: 1px solid #ffffff10;
+        }
+        .step h2 { 
+            font-size: 1.1em; 
+            margin-bottom: 16px;
+            color: var(--accent);
+        }
+        .step h2 .num {
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            width: 28px; height: 28px;
+            display: inline-flex; align-items: center; justify-content: center;
+            margin-right: 8px;
+            font-size: 0.9em;
+        }
+
+        .form-row { 
+            display: flex; gap: 16px; 
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .form-group { flex: 1; min-width: 200px; }
+        .form-group label { 
+            display: block; margin-bottom: 6px;
+            font-size: 0.85em; color: var(--text-dim);
+        }
+        select, input, textarea {
+            width: 100%; padding: 10px 12px;
+            background: var(--bg); color: var(--text);
+            border: 1px solid #ffffff20; border-radius: 8px;
+            font-size: 0.95em;
+        }
+        select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 12px; }
+        .checkbox-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 14px; background: var(--bg);
+            border-radius: 8px; cursor: pointer; user-select: none;
+            border: 1px solid #ffffff15;
+        }
+        .checkbox-item:hover { border-color: var(--accent); }
+        .checkbox-item.selected { border-color: var(--accent); background: var(--primary); }
+
+        .radio-group { display: flex; gap: 12px; }
+        .radio-item {
+            padding: 10px 20px; background: var(--bg);
+            border-radius: 8px; cursor: pointer; user-select: none;
+            border: 1px solid #ffffff15;
+        }
+        .radio-item:hover { border-color: var(--accent); }
+        .radio-item.selected { border-color: var(--green); background: var(--primary); }
+
+        .btn {
+            width: 100%; padding: 14px;
+            font-size: 1.05em; font-weight: 600;
+            border: none; border-radius: 10px; cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+        .btn-plan { background: var(--primary); color: white; }
+        .btn-plan:hover { background: #1a5080; }
+        .btn-apply { background: var(--accent); color: white; }
+        .btn-apply:hover { background: #d13448; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .output {
+            background: #0a0a16; border-radius: 10px;
+            padding: 16px; margin-top: 16px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em; max-height: 400px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-all;
+            display: none;
+        }
+        .output.visible { display: block; }
+
+        .config-preview {
+            background: #0a0a16; border-radius: 10px;
+            padding: 16px; margin-top: 12px;
+            font-family: 'Fira Code', monospace; font-size: 0.8em;
+            max-height: 250px; overflow-y: auto;
+            display: none;
+        }
+        .config-preview.visible { display: block; }
+
+        .badge {
+            display: inline-block; padding: 4px 10px;
+            border-radius: 12px; font-size: 0.75em;
+            font-weight: 600;
+        }
+        .badge-dev { background: #00c85333; color: #00c853; }
+        .badge-stg { background: #ff980033; color: #ff9800; }
+        .badge-prd { background: #e9456033; color: #e94560; }
+
+        #loading { display: none; text-align: center; padding: 12px; color: var(--text-dim); }
+        #loading.visible { display: block; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🏗️ IaC All-in-One</h1>
+    <p class="subtitle">Infrastructure as Code • Vault-powered • One Click Deploy</p>
+
+    <!-- STEP 1: Project & Environment -->
+    <div class="step">
+        <h2><span class="num">1</span> Project & Environment</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>📋 Project</label>
+                <select id="project">
+                    <option value="demo-app">demo-app</option>
+                    <option value="golden-path">golden-path</option>
+                    <option value="platform">platform</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>🌍 Environment</label>
+                <select id="env" onchange="updateEnvBadge(); loadVaultPreview();">
+                    <option value="dev">DEV</option>
+                    <option value="stg">STG</option>
+                    <option value="prd">PRD</option>
+                </select>
+            </div>
+            <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+                <span id="envBadge" class="badge badge-dev">DEV</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2: Components -->
+    <div class="step">
+        <h2><span class="num">2</span> Infrastructure Components</h2>
+        <div class="checkbox-group" id="layerCheckboxes">
+            <div class="checkbox-item selected" data-layer="network" onclick="toggleLayer(this)">
+                🌐 Network (VPC + Subnets)
+            </div>
+            <div class="checkbox-item selected" data-layer="compute" onclick="toggleLayer(this)">
+                ☸️ Compute (EKS + Vault + ArgoCD)
+            </div>
+            <div class="checkbox-item" data-layer="jenkins" onclick="toggleLayer(this)">
+                🔧 Jenkins (CI/CD Server)
+            </div>
+            <div class="checkbox-item" data-layer="rancher" onclick="toggleLayer(this)">
+                🐄 Rancher (Cluster Manager)
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3: Config Preview from Vault -->
+    <div class="step">
+        <h2><span class="num">3</span> Infrastructure Config (from Vault)</h2>
+        <button class="btn btn-plan" onclick="loadVaultPreview()" style="width:auto;padding:8px 20px;font-size:0.9em;">
+            🔄 Refresh from Vault
+        </button>
+        <div id="loading">⏳ Loading from Vault...</div>
+        <div class="config-preview" id="configPreview"></div>
+    </div>
+
+    <!-- STEP 4: Actions -->
+    <div class="step">
+        <h2><span class="num">4</span> Execute</h2>
+        <div class="radio-group" style="margin-bottom:16px">
+            <div class="radio-item selected" data-action="plan" onclick="selectRadio(this, 'action')">
+                🔍 Plan (Preview only)
+            </div>
+            <div class="radio-item" data-action="apply" onclick="selectRadio(this, 'action')">
+                🚀 Apply (Deploy!)
+            </div>
+        </div>
+        <button class="btn btn-plan" onclick="execute('plan')">
+            🔍 TERRAFORM PLAN
+        </button>
+        <button class="btn btn-apply" onclick="execute('apply')">
+            🚀 TERRAFORM APPLY
+        </button>
+        <div id="outputLoading" style="display:none;text-align:center;padding:12px;color:var(--text-dim)">⏳ Running Terraform (live log below)...</div>
+        <div class="output" id="output"></div>
+    </div>
+
+    <p style="text-align:center;color:var(--text-dim);font-size:0.75em;margin-top:30px">
+        IaC AIO v1.0 • Backend: <span id="backendStatus">checking...</span> • 
+        <a href="#" onclick="testBackend()" style="color:var(--accent)">Test connection</a>
+    </p>
+</div>
+
+<script>
+const API = 'http://localhost:7070';
+let selectedLayers = ['network', 'compute'];
+let selectedAction = 'plan';
+
+// ===== UI Interactions =====
+function toggleLayer(el) {
+    el.classList.toggle('selected');
+    selectedLayers = [...document.querySelectorAll('.checkbox-item.selected')]
+        .map(e => e.dataset.layer);
+}
+
+function selectRadio(el, group) {
+    document.querySelectorAll(`.radio-item`).forEach(r => r.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedAction = el.dataset.action;
+}
+
+function updateEnvBadge() {
+    const env = document.getElementById('env').value;
+    const badge = document.getElementById('envBadge');
+    badge.textContent = env.toUpperCase();
+    badge.className = `badge badge-${env}`;
+}
+
+// ===== API Calls =====
+async function loadVaultPreview() {
+    const env = document.getElementById('env').value;
+    const loading = document.getElementById('loading');
+    const preview = document.getElementById('configPreview');
+    
+    loading.classList.add('visible');
+    preview.classList.remove('visible');
+    
+    try {
+        const res = await fetch(`${API}/api/iac-vault/${env}/infrastructure`);
+        const data = await res.json();
+        
+        if (data.error) {
+            preview.innerHTML = `<span style="color:var(--accent)">❌ ${data.error}</span>`;
+        } else {
+            preview.innerHTML = Object.entries(data).map(([k,v]) => {
+                const val = typeof v === 'object' ? JSON.stringify(v) : v;
+                return `<div><span style="color:var(--accent)">${k}</span> = <span style="color:#ffa">${val}</span></div>`;
+            }).join('');
+        }
+    } catch(e) {
+        preview.innerHTML = `<span style="color:var(--accent)">❌ Cannot connect to backend at ${API}. Run: python3 platform/iac-backend/server.py</span>`;
+    }
+    
+    loading.classList.remove('visible');
+    preview.classList.add('visible');
+}
+
+async function execute(action) {
+    const env = document.getElementById('env').value;
+    const outputDiv = document.getElementById('output');
+    const loadingDiv = document.getElementById('outputLoading');
+    
+    // Reset UI
+    outputDiv.classList.remove('visible');
+    outputDiv.textContent = '';
+    loadingDiv.style.display = 'block';
+    
+    // Build SSE URL
+    const layersParam = selectedLayers.join(',');
+    const url = `${API}/api/iac-terraform-stream?env=${env}&layers=${encodeURIComponent(layersParam)}&action=${action}`;
+    
+    // ─── SSE: Nhận log realtime từng dòng ───
+    const eventSource = new EventSource(url);
+    
+    eventSource.onmessage = (event) => {
+        // Mỗi dòng log terraform
+        outputDiv.classList.add('visible');
+        outputDiv.textContent += event.data + '\n';
+        outputDiv.scrollTop = outputDiv.scrollHeight;  // auto-scroll
+    };
+    
+    eventSource.addEventListener('done', (event) => {
+        // Terraform hoàn tất
+        const info = JSON.parse(event.data);
+        outputDiv.textContent += `\n🏁 Layer ${info.layer} done (exit=${info.exit_code})\n`;
+        outputDiv.scrollTop = outputDiv.scrollHeight;
+    });
+    
+    eventSource.onerror = (event) => {
+        // SSE kết thúc (thành công hoặc lỗi)
+        if (eventSource.readyState === EventSource.CLOSED) {
+            outputDiv.textContent += '\n─── Stream ended ───\n';
+        } else {
+            outputDiv.textContent += '\n❌ Connection lost – retrying...\n';
+        }
+        loadingDiv.style.display = 'none';
+        // Đóng nếu đã CLOSED (state = 2)
+        if (eventSource.readyState === 2) {
+            eventSource.close();
+        }
+    };
+}
+
+async function testBackend() {
+    const status = document.getElementById('backendStatus');
+    try {
+        const res = await fetch(`${API}/api/health`);
+        const data = await res.json();
+        status.innerHTML = `<span style="color:var(--green)">✅ connected</span> (vault: ${data.vault_connected ? '✅' : '❌'})`;
+    } catch(e) {
+        status.innerHTML = `<span style="color:var(--accent)">❌ offline</span>`;
+    }
+}
+
+// Init
+updateEnvBadge();
+testBackend();
+loadVaultPreview();
+</script>
+</body>
+</html>

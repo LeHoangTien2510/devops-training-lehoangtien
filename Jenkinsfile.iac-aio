@@ -1,0 +1,320 @@
+// =============================================================================
+// Jenkinsfile.iac-aio – Infrastructure as Code All-in-One
+//
+// TRIẾT LÝ:
+//   1 pipeline duy nhất → deploy MỌI infrastructure layer, MỌI môi trường
+//   Vault là nguồn sự thật DUY NHẤT cho tất cả biến infrastructure
+//   UI parameterized → chọn env + layer → tự động terraform
+//
+// SO SÁNH VỚI CI/CD AIO:
+//   CI/CD AIO: build source code → push Docker → deploy app
+//   IaC AIO:   đọc Vault → gen tfvars → terraform apply infrastructure
+//
+// CẤU TRÚC VAULT:
+//   secret/{dev,stg,prd}/infrastructure → toàn bộ biến terraform
+//
+// JENKINS CREDENTIALS:
+//   + vault-token      (secret text)
+//   + kubeconfig        (secret file – để port-forward Vault nếu cần)
+// =============================================================================
+pipeline {
+    agent any
+
+    parameters {
+        // ─── Step 1: Project & Environment ───
+        choice(name: 'PROJECT_NAME', choices: ['demo-app', 'golden-path', 'platform'],
+               description: '📋 Project cần triển khai infrastructure')
+        choice(name: 'ENVIRONMENT',  choices: ['dev', 'stg', 'prd'],
+               description: '🌍 Môi trường triển khai')
+
+        // ─── Step 2: Infrastructure Layers ───
+        // LƯU Ý: Thứ tự quan trọng! network → compute → jenkins/rancher
+        string(name: 'LAYERS', defaultValue: 'network,compute',
+               description: '📦 Layers cần deploy (theo thứ tự: network,compute,jenkins,rancher)')
+
+        // ─── Step 3: Terraform Action ───
+        choice(name: 'TF_ACTION', choices: ['plan', 'apply'],
+               description: '🔧 plan = xem trước | apply = triển khai thật')
+
+        // ─── Vault ───
+        string(name: 'VAULT_ADDR', defaultValue: 'http://k8s-vault-vault-f0945465b9-571985b2bd95c647.elb.us-east-1.amazonaws.com:8200',
+               description: '🔐 Vault Internal NLB URL')
+        string(name: 'VAULT_INFRA_PATH', defaultValue: 'secret/${ENVIRONMENT}/infrastructure',
+               description: '🔐 Vault path cho biến infrastructure (tự tính từ env)')
+    }
+
+    environment {
+        AWS_REGION      = 'us-east-1'
+        AWS_PROFILE     = 'root-lab-2'
+        TF_STATE_BUCKET = 'terraform-state-devops-lab-tien-v3'
+        INFRA_ROOT      = "${WORKSPACE}/infra"
+    }
+
+    stages {
+
+        // ═══════════════════════════════════════════════════════════════
+        // STAGE 1: Verify Tools
+        // ═══════════════════════════════════════════════════════════════
+        stage('1. Verify Tools') {
+            steps {
+                sh '''
+                    echo "=============================================="
+                    echo "  IaC AIO – VERIFY TOOLS"
+                    echo "=============================================="
+                    echo "Project:     ${PROJECT_NAME}"
+                    echo "Environment: ${ENVIRONMENT}"
+                    echo "Layers:      ${LAYERS}"
+                    echo "Action:      ${TF_ACTION}"
+                    echo "Vault:       ${VAULT_ADDR}"
+                    echo ""
+                    terraform version || exit 1
+                    vault version    || echo "⚠️  Vault CLI not installed (will use API)"
+                    aws --version    || echo "⚠️  AWS CLI not installed"
+                    kubectl version --client --short 2>/dev/null || echo "⚠️  kubectl"
+                    echo ""
+                    echo "✅ Tools verified"
+                '''
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // STAGE 2: Checkout (infra code đã có trong repo)
+        // ═══════════════════════════════════════════════════════════════
+        stage('2. Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // STAGE 3: 🔐 Fetch Infrastructure Config from Vault
+        //           Đọc TOÀN BỘ biến infra cho environment được chọn
+        // ═══════════════════════════════════════════════════════════════
+        stage('3. 🔐 Fetch Infra Config from Vault') {
+            steps {
+                withCredentials([string(credentialsId: 'vault-token', variable: 'VAULT_TOKEN')]) {
+                    script {
+                        // Dùng vault CLI nếu có, fallback sang curl API
+                        def vaultData = sh(script: '''
+                            VAULT_PATH="secret/${ENVIRONMENT}/infrastructure"
+
+                            if command -v vault &>/dev/null; then
+                                vault login -no-print -address=${VAULT_ADDR} ${VAULT_TOKEN} 2>/dev/null
+                                vault kv get -format=json -address=${VAULT_ADDR} ${VAULT_PATH}
+                            else
+                                curl -s -H "X-Vault-Token: ${VAULT_TOKEN}" "${VAULT_ADDR}/v1/${VAULT_PATH}"
+                            fi
+                        ''', returnStdout: true).trim()
+
+                        // Ghi ra file JSON cho các stage sau dùng
+                        writeFile file: 'vault-infra.json', text: vaultData
+
+                        // Parse và hiển thị summary
+                        def clusterName = sh(script: '''
+                            python3 -c "
+import json, sys
+d = json.load(open('vault-infra.json'))
+data = d.get('data',{}).get('data', d.get('data',{}))
+print(data.get('cluster_name', 'N/A'))
+" 2>/dev/null || echo "N/A"
+                        ''', returnStdout: true).trim()
+
+                        echo """
+                            ╔══════════════════════════════════════════╗
+                            ║  INFRA CONFIG FROM VAULT               ║
+                            ║  Path: secret/${ENVIRONMENT}/infrastructure
+                            ║  Cluster: ${clusterName}
+                            ╚══════════════════════════════════════════╝
+                        """
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // STAGE 4: 📝 Generate terraform.tfvars from Vault
+        //           Map Vault JSON → terraform.tfvars cho từng layer
+        // ═══════════════════════════════════════════════════════════════
+        stage('4. 📝 Generate terraform.tfvars') {
+            steps {
+                script {
+                    sh '''
+                        python3 -c "
+import json, os, sys
+
+# Đọc vault data
+with open('vault-infra.json') as f:
+    d = json.load(f)
+vault = d.get('data',{}).get('data', d.get('data',{}))
+
+env = '${ENVIRONMENT}'
+layers = '${LAYERS}'.split(',')
+
+# Map Vault → tfvars cho từng layer
+common = {
+    'aws_region': vault.get('aws_region', 'us-east-1'),
+    'aws_profile': vault.get('aws_profile', 'root-lab-2'),
+    'environment': vault.get('environment', env),
+}
+
+layer_mappings = {
+    'network': {
+        'vpc_name': vault.get('vpc_name', f'eks-lab-vpc-' + vault.get('environment', env)),
+        'vpc_cidr': vault.get('vpc_cidr', '10.0.0.0/16'),
+        'private_subnets': vault.get('private_subnets', ['10.0.1.0/24','10.0.2.0/24']),
+        'public_subnets': vault.get('public_subnets', ['10.0.101.0/24','10.0.102.0/24']),
+    },
+    'compute': {
+        'cluster_name': vault.get('cluster_name', 'eks-devops-lab'),
+        'node_instance_types': vault.get('node_instance_types', ['c7i-flex.large']),
+        'node_desired_size': vault.get('node_desired_size', 2),
+        'node_min_size': vault.get('node_min_size', 1),
+        'node_max_size': vault.get('node_max_size', 3),
+    },
+    'jenkins': {
+        'jenkins_instance_type': vault.get('jenkins_instance_type', 'm7i-flex.large'),
+        'jenkins_root_volume_size': vault.get('jenkins_root_volume_size', 30),
+        'key_name': vault.get('key_name', 'KeyPair-2'),
+    },
+    'rancher': {
+        'rancher_instance_type': vault.get('rancher_instance_type', 'c7i-flex.large'),
+        'rancher_root_volume_size': vault.get('rancher_root_volume_size', 50),
+        'key_name': vault.get('key_name', 'KeyPair-2'),
+    },
+}
+
+for layer in layers:
+    layer = layer.strip()
+    layer_dir = f'infra/envs/{env}/{layer}'
+    if not os.path.isdir(layer_dir):
+        print(f'⚠️  Directory not found: {layer_dir}, skipping...')
+        continue
+    
+    lines = [f'# Auto-generated by IaC AIO from Vault']
+    lines.append(f'# Env: {env}, Layer: {layer}')
+    lines.append('')
+    
+    for k, v in common.items():
+        lines.append(f'{k} = {json.dumps(v)}')
+    
+    if layer in layer_mappings:
+        for k, v in layer_mappings[layer].items():
+            lines.append(f'{k} = {json.dumps(v)}')
+    
+    tfvars_path = f'{layer_dir}/terraform.tfvars'
+    with open(tfvars_path, 'w') as f:
+        f.write('\\n'.join(lines) + '\\n')
+    
+    print(f'✅ Generated: {tfvars_path}')
+"
+                    '''
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // STAGE 5: 🚀 Terraform (Plan or Apply) cho từng layer
+        //           Network trước → Compute sau → Jenkins/Rancher cuối
+        // ═══════════════════════════════════════════════════════════════
+        stage('5. 🚀 Terraform') {
+            steps {
+                script {
+                    def layers = params.LAYERS.split(',').collect { it.trim() }
+
+                    // Approve trước khi apply (stg/prd)
+                    if (params.TF_ACTION == 'apply' && params.ENVIRONMENT != 'dev') {
+                        input message: """
+⚠️  APPROVAL REQUIRED
+Environment: ${params.ENVIRONMENT}
+Layers: ${params.LAYERS}
+Action: APPLY
+
+Bạn có chắc muốn áp dụng thay đổi lên môi trường ${params.ENVIRONMENT}?
+""", ok: '✅ Apply'
+                    }
+
+                    layers.each { layer ->
+                        stage("${layer}") {
+                            dir("infra/envs/${params.ENVIRONMENT}/${layer}") {
+                                sh '''
+                                    echo "=============================================="
+                                    echo "  TERRAFORM: $(basename $(pwd))"
+                                    echo "  Action: ${TF_ACTION}"
+                                    echo "=============================================="
+                                    echo ""
+                                    
+                                    terraform init -input=false \
+                                        -backend-config="bucket=${TF_STATE_BUCKET}" \
+                                        -backend-config="region=${AWS_REGION}" \
+                                        -backend-config="profile=${AWS_PROFILE}" \
+                                        -backend-config="key=envs/${ENVIRONMENT}/$(basename $(pwd))/terraform.tfstate"
+
+                                    if [ "${TF_ACTION}" = "plan" ]; then
+                                        terraform plan -input=false
+                                    else
+                                        terraform apply -auto-approve -input=false
+                                        
+                                        # 🧹 Auto-clean: xóa tfvars tránh push nhầm Git
+                                        rm -f terraform.tfvars
+                                        echo "🧹 Auto-cleaned terraform.tfvars"
+                                        
+                                        # Post-terraform: auto-run Ansible cho jenkins/rancher
+                                        LAYER_NAME=$(basename $(pwd))
+                                        if [ "${TF_ACTION}" = "apply" ]; then
+                                            case "${LAYER_NAME}" in
+                                                jenkins)
+                                                    echo ""
+                                                    echo "━━━ Ansible: Jenkins Provisioning ━━━"
+                                                    cd ${INFRA_ROOT}/ansible
+                                                    ansible-playbook -i inventory.ini jenkins-playbook.yml
+                                                    cd -
+                                                    ;;
+                                                rancher)
+                                                    echo ""
+                                                    echo "━━━ Ansible: Rancher Provisioning ━━━"
+                                                    cd ${INFRA_ROOT}/ansible
+                                                    ansible-playbook -i inventory.ini rancher-playbook.yml
+                                                    cd -
+                                                    ;;
+                                            esac
+                                        fi
+                                    fi
+                                    
+                                    echo ""
+                                    echo "✅ Terraform ${TF_ACTION} completed for $(basename $(pwd))"
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // POST: Hiển thị output
+    // ═══════════════════════════════════════════════════════════════
+    post {
+        always {
+            script {
+                echo """
+                    ╔══════════════════════════════════════════╗
+                    ║  IaC AIO – Summary                      ║
+                    ║  Project:  ${params.PROJECT_NAME}        ║
+                    ║  Env:      ${params.ENVIRONMENT}         ║
+                    ║  Layers:   ${params.LAYERS}              ║
+                    ║  Action:   ${params.TF_ACTION}           ║
+                    ║  Vault:    ${params.VAULT_INFRA_PATH}    ║
+                    ╚══════════════════════════════════════════╝
+                """
+                cleanWs()
+            }
+        }
+        success {
+            echo "✅ IaC AIO pipeline completed successfully"
+        }
+        failure {
+            echo "❌ IaC AIO pipeline failed – check logs above"
+        }
+    }
+}

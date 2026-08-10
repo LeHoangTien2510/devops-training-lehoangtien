@@ -1,0 +1,180 @@
+# =============================================================================
+# Backstage Software Template: IaC All-in-One
+# =============================================================================
+# Cho phép chọn Project → Environment → Components → Terraform Apply
+# Tất cả biến infrastructure được đọc từ Vault
+# =============================================================================
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: iac-allinone
+  title: 🏗️ IaC All-in-One – Deploy Infrastructure
+  description: |
+    Chọn project → chọn môi trường → chọn components → Terraform tự động apply.
+    Tất cả biến infrastructure (VPC CIDR, instance type, node count,...) 
+    được đọc từ Vault theo path: secret/{env}/infrastructure
+  tags:
+    - infrastructure
+    - terraform
+    - vault
+    - aws
+  links:
+    - title: Jenkins Pipeline
+      url: http://jenkins:8080/job/iac-allinone
+      icon: dashboard
+
+spec:
+  owner: platform-team
+  type: infrastructure
+  lifecycle: production
+
+  # ════════════════════════════════════════════════════════════
+  # STEP 1: Chọn Project + Environment
+  # ════════════════════════════════════════════════════════════
+  parameters:
+    - title: "📋 Step 1: Project & Environment"
+      required:
+        - project_name
+        - environment
+      properties:
+        project_name:
+          title: Project Name
+          type: string
+          description: Chọn project cần triển khai infrastructure
+          enum:
+            - demo-app
+            - golden-path
+            - platform
+          default: demo-app
+          ui:autofocus: true
+
+        environment:
+          title: Environment
+          type: string
+          description: Môi trường cần triển khai
+          enum:
+            - dev
+            - stg
+            - prd
+          default: dev
+          ui:widget: radio
+
+    # ════════════════════════════════════════════════════════════
+    # STEP 2: Chọn Components (Infrastructure Layers)
+    # ════════════════════════════════════════════════════════════
+    - title: "📦 Step 2: Infrastructure Components"
+      required:
+        - components
+      properties:
+        components:
+          title: Layers to Deploy
+          type: array
+          description: Chọn các tầng infrastructure cần triển khai (theo thứ tự)
+          items:
+            type: string
+            enum:
+              - network
+              - compute
+              - jenkins
+              - rancher
+            enumNames:
+              - "🌐 Network (VPC + Subnets)"
+              - "☸️  Compute (EKS + Vault + ArgoCD)"
+              - "🔧 Jenkins (CI/CD Server)"
+              - "🐄 Rancher (Cluster Manager)"
+          uniqueItems: true
+          default:
+            - network
+            - compute
+          ui:widget: checkboxes
+
+        action:
+          title: Terraform Action
+          type: string
+          description: Plan = xem trước thay đổi, Apply = triển khai thật
+          enum:
+            - plan
+            - apply
+          default: plan
+          ui:widget: radio
+
+    # ════════════════════════════════════════════════════════════
+    # STEP 3: Review Config từ Vault (readonly)
+    # ════════════════════════════════════════════════════════════
+    - title: "🔐 Step 3: Infrastructure Config (from Vault)"
+      properties:
+        vault_path:
+          title: Vault Path
+          type: string
+          description: Path trong Vault chứa biến infrastructure (tự tính từ env)
+          default: secret/${{ parameters.environment }}/infrastructure
+          ui:disabled: true
+
+        cluster_name_display:
+          title: "Cluster Name (preview)"
+          type: string
+          description: Sẽ hiển thị sau khi fetch từ Vault
+          default: "→ Click NEXT để load từ Vault"
+          ui:disabled: true
+
+  # ════════════════════════════════════════════════════════════
+  # STEPS: Backend thực thi
+  # ════════════════════════════════════════════════════════════
+  steps:
+    # Fetch config từ Vault
+    - id: fetch-vault
+      name: 🔐 Fetch Infrastructure Config from Vault
+      action: http:backstage:request
+      input:
+        method: GET
+        path: /api/iac-vault/${{ parameters.environment }}/infrastructure
+
+    # Generate terraform.tfvars từ Vault data
+    - id: generate-tfvars
+      name: 📝 Generate terraform.tfvars
+      action: http:backstage:request
+      input:
+        method: POST
+        path: /api/iac-generate-tfvars
+        body:
+          environment: ${{ parameters.environment }}
+          vault_data: ${{ steps['fetch-vault'].output.body }}
+
+    # Chạy Terraform cho từng layer
+    - id: terraform-plan
+      name: 🔍 Terraform ${{ parameters.action }}
+      if: ${{ parameters.action === 'plan' }}
+      action: http:backstage:request
+      input:
+        method: POST
+        path: /api/iac-terraform
+        body:
+          action: plan
+          environment: ${{ parameters.environment }}
+          layers: ${{ parameters.components }}
+
+    - id: terraform-apply
+      name: 🚀 Terraform ${{ parameters.action }}
+      if: ${{ parameters.action === 'apply' }}
+      action: http:backstage:request
+      input:
+        method: POST
+        path: /api/iac-terraform
+        body:
+          action: apply
+          environment: ${{ parameters.environment }}
+          layers: ${{ parameters.components }}
+
+  output:
+    links:
+      - title: View in AWS Console
+        url: https://us-east-1.console.aws.amazon.com
+      - title: Jenkins Pipeline Log
+        url: http://localhost:8080/job/iac-allinone
+    text:
+      - title: "✅ Infrastructure ${{ parameters.action }} completed"
+        content: |
+          Project: ${{ parameters.project_name }}
+          Environment: ${{ parameters.environment }}
+          Layers: ${{ join(parameters.components, ', ') }}
+          Action: ${{ parameters.action }}

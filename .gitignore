@@ -49,3 +49,6 @@ Thumbs.db
 *.log
 *.retry
 *.backup
+
+# IaC AIO – prevent accidental tfvars commit
+**/terraform.tfvars
