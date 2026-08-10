@@ -60,6 +60,8 @@ pipeline {
                description: 'Namespace (để trống = PROJECT_NAME-ENVIRONMENT)')
         string(name: 'KUBE_CONFIG_CRED', defaultValue: 'kubeconfig',
                description: 'Jenkins credential ID chứa file kubeconfig (Secret file)')
+        booleanParam(name: 'ROTATE_DB_PASSWORD', defaultValue: false,
+               description: 'Rotate MySQL password (đổi pass trong DB + restart MySQL Pod)')
     }
 
     // =========================================================================
@@ -372,6 +374,35 @@ pipeline {
                           --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
                         echo "✅ mysql-secret ready in ${KUBE_NAMESPACE}"
+                    '''
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 10b: Rotate MySQL Password (tùy chọn - bật bằng parameter)
+        //            Đọc pass mới từ Vault → ALTER USER trong DB → restart MySQL
+        // ═══════════════════════════════════════════════════════════════════
+        stage('10b. 🔄 Rotate MySQL Password') {
+            when { expression { params.ROTATE_DB_PASSWORD } }
+            steps {
+                withCredentials([file(credentialsId: params.KUBE_CONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                    sh '''
+                        export KUBECONFIG=${KUBECONFIG_FILE}
+                        set -a; . ${WORKSPACE}/vault-env.properties; set +a
+
+                        echo "→ ALTER USER postgres..."
+                        kubectl exec -i -n ${KUBE_NAMESPACE} pod/mysql-0 -- mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "ALTER USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}'; FLUSH PRIVILEGES;" 2>/dev/null && echo "✅ Password rotated in MySQL" || echo "⚠️  ALTER USER failed (DB might not exist yet)"
+
+                        echo "→ Restart MySQL pod..."
+                        kubectl rollout restart statefulset mysql -n ${KUBE_NAMESPACE}
+                        kubectl rollout status statefulset mysql -n ${KUBE_NAMESPACE} --timeout 3m
+                        echo "✅ MySQL restarted with new password"
+
+                        echo "→ Restart backend pods (để đọc password mới)..."
+                        kubectl rollout restart rollout ecommerce-backend -n ${KUBE_NAMESPACE}
+                        kubectl argo rollouts status --insecure-skip-tls-verify ecommerce-backend -n ${KUBE_NAMESPACE} --timeout 5m
+                        echo "✅ Backend restarted"
                     '''
                 }
             }

@@ -57,14 +57,91 @@ kubectl get svc vault -n vault -o jsonpath='{.status.loadBalancer.ingress[0].hos
 | 10 | 🔧 Create Secrets | `kubectl create secret mysql-secret` |
 | 11 | 🚀 Deploy | `kubectl argo rollouts set image` → Canary/B-G |
 
-## Jenkins Credentials
+## Jenkins Credentials (cần tạo thủ công)
 
-| ID | Loại | Mô tả |
-|----|------|-------|
-| `vault-token` | Secret text | Token cho `vault login` (lấy từ `vault-init.sh`) |
-| `kubeconfig` | Secret file | File `~/.kube/config` (từ `aws eks update-kubeconfig`) |
+Vào **Manage Jenkins → Credentials → System → Global → Add Credentials**
 
-## Vault Structure
+### 1. `vault-token` (Secret text)
+
+Token để `vault login` vào Vault qua CLI.
+
+**Cách lấy:**
+```bash
+# Token được in ra khi chạy vault-init.sh
+bash infra/vault/vault-init.sh
+# → 🔑 JENKINS DEDICATED TOKEN: hvs.CAES...
+
+# HOẶC tạo token mới:
+ROOT_TOKEN=$(python3 -c "import json; print(json.load(open('infra/vault/vault-credentials.json'))['root_token'])")
+kubectl exec -n vault vault-0 -- sh -c "VAULT_TOKEN=$ROOT_TOKEN vault token create -policy=jenkins-pipeline -ttl=720h -display-name=jenkins-allinone -format=json" | python3 -c "import json,sys; print(json.load(sys.stdin)['auth']['client_token'])"
+```
+
+| Field | Value |
+|-------|-------|
+| Kind | **Secret text** |
+| ID | `vault-token` |
+| Secret | `<token từ lệnh trên>` |
+
+### 2. `kubeconfig` (Secret file)
+
+File kubeconfig để `kubectl` kết nối EKS cluster.
+
+**Cách lấy:**
+```bash
+# 1. Update kubeconfig local
+aws eks update-kubeconfig --region us-east-1 --name eks-devops-lab --profile root-lab-2
+
+# 2. Lấy nội dung file
+cat ~/.kube/config
+
+# 3. Copy toàn bộ → tạo file config (không đuôi) trên Windows → upload
+```
+
+| Field | Value |
+|-------|-------|
+| Kind | **Secret file** |
+| ID | `kubeconfig` |
+| File | File `config` (không đuôi, nội dung từ `~/.kube/config`) |
+
+> ⚠️ Mỗi lần EKS cluster recreate, phải update lại credential này.
+
+---
+
+## Vault Secrets (cần tạo thủ công)
+
+Vào Vault UI: `kubectl port-forward -n vault svc/vault 8200:8200` → `http://localhost:8200` → Login root token.
+
+### 1. `secret/common/registry` — Docker Hub credentials
+
+| Key | Value |
+|-----|-------|
+| `dockerhub_user` | `lehoangtien2510` |
+| `dockerhub_password` | Docker Hub Access Token |
+
+> Vào [hub.docker.com](https://hub.docker.com) → Account Settings → Security → New Access Token → copy token.
+
+### 2. `secret/common/tools` — SonarQube token
+
+| Key | Value |
+|-----|-------|
+| `sonarqube_token` | SonarQube token |
+
+> Vào `http://<JENKINS_IP>:9000` → Administration → Security → Users → admin → Tokens → Generate Token → copy.
+
+### 3. `secret/demo-app/mysql` — MySQL credentials
+
+| Key | Value |
+|-----|-------|
+| `root-password` | `<password>` |
+| `database` | `full-stack-ecommerce` |
+| `username` | `ecommerceapp` |
+| `password` | `<password>` |
+
+> Tự đặt password. Phải khớp với `kubectl create secret` ở bước provision app.
+
+---
+
+## Vault Structure (tổng quan)
 
 ```
 secret/
@@ -104,6 +181,33 @@ kubectl create secret generic mysql-secret -n demo-app-dev \
 helm install demo-app charts/demo-app -n demo-app-dev -f charts/demo-app/values.yaml
 
 # 6. Build with Parameters trên Jenkins
+```
+
+## Destroy (đúng cách – tránh orphan Load Balancer)
+
+> ⚠️ **Phải xóa Helm releases TRƯỚC khi terraform destroy**, nếu không LoadBalancer sẽ bị orphan và không tự xóa được.
+
+```bash
+# 1. Xóa app (nếu đã cài thủ công)
+helm uninstall demo-app -n demo-app-dev 2>/dev/null
+
+# 2. Xóa TẤT CẢ Helm releases (xóa LoadBalancers trước)
+helm uninstall vault -n vault 2>/dev/null
+helm uninstall ingress-nginx -n ingress-nginx 2>/dev/null
+helm uninstall kube-prometheus-stack -n demo-app 2>/dev/null
+helm uninstall argocd -n argocd 2>/dev/null
+helm uninstall argo-rollouts -n argo-rollouts 2>/dev/null
+helm uninstall cert-manager -n cert-manager 2>/dev/null
+
+# 3. Verify không còn LoadBalancer nào
+kubectl get svc --all-namespaces | grep LoadBalancer
+# → (phải trống)
+
+# 4. Terraform destroy
+cd infra/envs/dev/compute && terraform destroy -auto-approve -var="aws_profile=root-lab-2" -var="aws_region=us-east-1"
+cd infra/envs/dev/network && terraform destroy -auto-approve -var="aws_profile=root-lab-2" -var="aws_region=us-east-1"
+
+# 5. Verify trên AWS Console: EC2 → Load Balancers → (phải trống)
 ```
 
 ## Progressive Delivery

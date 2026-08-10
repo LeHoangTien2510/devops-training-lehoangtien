@@ -14,7 +14,14 @@ global:
   tlsDisable: true  # Lab: tắt TLS cho đơn giản; Production PHẢI bật
 
 server:
-  # HA mode: 3 nodes
+  # Chỉ dùng 1 LoadBalancer (vault service), không tạo vault-active/vault-standby
+  service:
+    enabled: true
+  # Tắt extra service để tiết kiệm NLB
+  standalone:
+    enabled: false
+
+  # HA mode: 3 nodes, nhưng chỉ 1 NLB
   ha:
     enabled: true
     replicas: 3

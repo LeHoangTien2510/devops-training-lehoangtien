@@ -24,6 +24,19 @@ spec:
         app: ecommerce-backend
         app.kubernetes.io/component: backend
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "⏳ Waiting for MySQL..."
+              until nc -z {{ .Values.mysql.service.name }} {{ .Values.mysql.service.port }}; do
+                echo "   MySQL not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "✅ MySQL is ready"
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
