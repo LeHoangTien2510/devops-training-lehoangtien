@@ -95,71 +95,35 @@ spec:
           ui:widget: radio
 
     # ════════════════════════════════════════════════════════════
-    # STEP 3: Review Config từ Vault (readonly)
+    # STEP 3: Preview Vault (mở tab riêng để xem + refresh)
     # ════════════════════════════════════════════════════════════
-    - title: "🔐 Step 3: Infrastructure Config (from Vault)"
+    - title: "🔐 Step 3: Verify Infrastructure Config"
       properties:
-        vault_path:
-          title: Vault Path
+        vault_url:
+          title: "🔗 Open Vault Config in new tab"
           type: string
-          description: Path trong Vault chứa biến infrastructure (tự tính từ env)
-          default: secret/${{ parameters.environment }}/infrastructure
-          ui:disabled: true
-
-        cluster_name_display:
-          title: "Cluster Name (preview)"
-          type: string
-          description: Sẽ hiển thị sau khi fetch từ Vault
-          default: "→ Click NEXT để load từ Vault"
-          ui:disabled: true
+          description: |
+            Mở link này trong tab mới để xem config từ Vault.
+            Đổi dev/stg/prd để kiểm tra từng môi trường.
+            Có thể refresh để load lại.
+          default: "http://localhost:7070/api/iac-vault/dev/infrastructure"
+          ui:help: |
+            💡 Mở link trên trong tab mới → thấy JSON config thật từ Vault.
+            Đổi /dev/ thành /stg/ hoặc /prd/ để kiểm tra môi trường khác.
 
   # ════════════════════════════════════════════════════════════
   # STEPS: Backend thực thi
   # ════════════════════════════════════════════════════════════
   steps:
-    # Fetch config từ Vault
-    - id: fetch-vault
-      name: 🔐 Fetch Infrastructure Config from Vault
-      action: http:backstage:request
+    # Chạy Terraform (đọc Vault + gen tfvars + apply)
+    - id: terraform
+      name: 🚀 Deploy Infrastructure
+      action: iac:terraform
       input:
-        method: GET
-        path: /api/iac-vault/${{ parameters.environment }}/infrastructure
-
-    # Generate terraform.tfvars từ Vault data
-    - id: generate-tfvars
-      name: 📝 Generate terraform.tfvars
-      action: http:backstage:request
-      input:
-        method: POST
-        path: /api/iac-generate-tfvars
-        body:
-          environment: ${{ parameters.environment }}
-          vault_data: ${{ steps['fetch-vault'].output.body }}
-
-    # Chạy Terraform cho từng layer
-    - id: terraform-plan
-      name: 🔍 Terraform ${{ parameters.action }}
-      if: ${{ parameters.action === 'plan' }}
-      action: http:backstage:request
-      input:
-        method: POST
-        path: /api/iac-terraform
-        body:
-          action: plan
-          environment: ${{ parameters.environment }}
-          layers: ${{ parameters.components }}
-
-    - id: terraform-apply
-      name: 🚀 Terraform ${{ parameters.action }}
-      if: ${{ parameters.action === 'apply' }}
-      action: http:backstage:request
-      input:
-        method: POST
-        path: /api/iac-terraform
-        body:
-          action: apply
-          environment: ${{ parameters.environment }}
-          layers: ${{ parameters.components }}
+        environment: ${{ parameters.environment }}
+        layers: ${{ parameters.components }}
+        action: ${{ parameters.action }}
+        project_name: ${{ parameters.project_name }}
 
   output:
     links:

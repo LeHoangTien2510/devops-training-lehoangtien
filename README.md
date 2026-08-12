@@ -122,6 +122,21 @@ ArgoCD:
 └── Dockerfile.jenkins         # Custom Jenkins image
 ```
 
+## IaC All-in-One (NEW)
+
+> 🆕 Xem hướng dẫn đầy đủ: [docs/iac-aio-guide.md](docs/iac-aio-guide.md)
+
+IaC AIO cho phép deploy infrastructure qua UI với Vault + Terraform:
+
+- **HTML UI**: `platform/iac-ui/index.html` — Demo nhanh, log realtime
+- **Backstage**: `backstage-portal/` — Production UI (Software Template)
+- **Backend**: `platform/iac-backend/server.py` — Đọc Vault, gen tfvars, chạy Terraform
+- **Jenkins**: `Jenkinsfile.iac-aio` — Pipeline IaC AIO trên Jenkins
+
+```
+UI (HTML/Backstage) → server.py → Vault → terraform.tfvars → terraform apply → AWS
+```
+
 ## How to Deploy
 
 ### Prerequisites

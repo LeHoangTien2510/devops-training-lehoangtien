@@ -1,0 +1,98 @@
+app:
+  baseUrl: http://localhost:3001
+  extensions:
+  - page:catalog:
+      config:
+        path: /
+  packages: all
+  title: Scaffolded Backstage App
+
+auth:
+  clientIdMetadataDocuments:
+    enabled: false
+  providers:
+    guest: {}
+backend:
+  actions:
+    pluginSources:
+    - auth
+    - catalog
+    - scaffolder
+  baseUrl: http://localhost:7007
+  cors:
+    credentials: true
+    methods:
+    - GET
+    - HEAD
+    - PATCH
+    - POST
+    - PUT
+    - DELETE
+    origin: http://localhost:3001
+  csp:
+    connect-src:
+    - '''self'''
+    - 'http:'
+    - 'https:'
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+  listen:
+    port: 7007
+catalog:
+  import:
+    entityFilename: catalog-info.yaml
+    pullRequestBranchName: backstage-integration
+  locations:
+  - target: ../../examples/entities.yaml
+    type: file
+  - rules:
+    - allow:
+      - Template
+    target: ../../examples/template/template.yaml
+    type: file
+  - rules:
+    - allow:
+      - Template
+    target: ../../templates/template.yaml
+    type: file
+  - rules:
+    - allow:
+      - User
+      - Group
+    target: ../../examples/org.yaml
+    type: file
+  rules:
+  - allow:
+    - Component
+    - System
+    - API
+    - Resource
+    - Location
+integrations:
+  github:
+  - host: github.com
+    token: ${GITHUB_TOKEN}
+kubernetes: null
+mcpActions:
+  description: Tools for managing your software catalog, creating new services from
+    templates, and exploring your developer portal
+  name: My Company Backstage
+organization:
+  name: My Company
+permission:
+  enabled: true
+proxy:
+  endpoints:
+    /iac-api/:
+      target: http://localhost:7070
+      changeOrigin: true
+      pathRewrite:
+        '^/api/proxy/iac-api/': '/api/'
+scaffolder: null
+techdocs:
+  builder: local
+  generator:
+    runIn: docker
+  publisher:
+    type: local
