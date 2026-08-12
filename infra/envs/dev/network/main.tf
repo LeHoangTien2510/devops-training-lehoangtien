@@ -5,6 +5,7 @@ module "network" {
   aws_profile = var.aws_profile
   environment = var.environment
 
+  vpc_name        = var.vpc_name
   vpc_cidr        = var.vpc_cidr
   private_subnets = var.private_subnets
   public_subnets  = var.public_subnets

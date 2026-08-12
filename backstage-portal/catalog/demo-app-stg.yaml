@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: demo-app-stg
+  title: demo-app (stg)
+  description: IaC project
+  tags:
+    - iac
+    - terraform
+    - stg
+  annotations:
+    iac.environment: stg
+    iac.project: demo-app
+    iac.cluster-name: eks-devops-lab-stg
+    iac.vpc-cidr: 10.1.0.0/16
+spec:
+  type: infrastructure
+  owner: user:guest
+  lifecycle: production

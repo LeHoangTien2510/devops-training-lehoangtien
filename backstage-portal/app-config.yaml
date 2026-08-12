@@ -62,6 +62,11 @@ catalog:
       - Group
     target: ../../examples/org.yaml
     type: file
+  - rules:
+    - allow:
+      - Resource
+    target: ./catalog/demo-app-stg.yaml
+    type: file
   rules:
   - allow:
     - Component

@@ -35,6 +35,8 @@ pipeline {
         // ─── Project & Environment ───
         string(name: 'PROJECT_NAME',  defaultValue: 'demo-app', description: 'Tên project (demo-app)')
         choice(name: 'ENVIRONMENT',   choices: ['dev', 'stg', 'prd'], description: 'Môi trường deploy')
+        string(name: 'GIT_REPO_URL',  defaultValue: 'https://github.com/LeHoangTien2510/devops-training-lehoangtien.git',
+               description: 'Git repo URL (để trống = dùng repo của pipeline job này)')
         string(name: 'GIT_BRANCH',    defaultValue: 'Week-8-CI-full', description: 'Branch source code')
 
         // ─── Module selection (giống mentor: chọn component cần deploy) ───
@@ -48,7 +50,7 @@ pipeline {
                description: 'Docker Hub repo cho frontend')
 
         // ─── Vault Configuration ───
-        string(name: 'VAULT_ADDR',     defaultValue: 'http://k8s-vault-vault-978d573894-0c92ff37df2c445c.elb.us-east-1.amazonaws.com:8200',
+        string(name: 'VAULT_ADDR',     defaultValue: 'http://k8s-vault-vault-816eecf7c9-2963d6061c2d3d5e.elb.us-east-1.amazonaws.com:8200',
                description: 'Vault Internal NLB URL (cùng VPC với Jenkins)')
         string(name: 'VAULT_APP_PATH', defaultValue: 'secret/demo-app/mysql',
                description: 'Vault path cho app secrets (MySQL, API keys...)')
@@ -113,11 +115,17 @@ pipeline {
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // STAGE 2: Checkout Source Code
+        // STAGE 2: Checkout Source Code (từ GIT_REPO_URL hoặc repo của job)
         // ═══════════════════════════════════════════════════════════════════
         stage('2. Checkout') {
             steps {
-                checkout scm
+                script {
+                    if (params.GIT_REPO_URL?.trim()) {
+                        git url: params.GIT_REPO_URL, branch: params.GIT_BRANCH
+                    } else {
+                        checkout scm
+                    }
+                }
             }
         }
 

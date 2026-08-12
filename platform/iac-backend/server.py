@@ -220,6 +220,15 @@ class IacHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_text(self, text, content_type="text/plain"):
+        body = text.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
     
     def _read_body(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -257,6 +266,18 @@ class IacHandler(BaseHTTPRequestHandler):
             self._send_json(data)
             return
         
+        # ─── GET /catalog/{file} — serve catalog YAML files ───
+        if path.startswith("/catalog/"):
+            catalog_dir = os.path.join(os.path.dirname(INFRA_ROOT), "backstage-portal", "catalog")
+            filename = path.split("/", 2)[-1]
+            filepath = os.path.join(catalog_dir, filename)
+            if os.path.isfile(filepath) and filename.endswith(('.yaml', '.yml')):
+                with open(filepath) as f:
+                    self._send_text(f.read(), "application/x-yaml")
+            else:
+                self._send_json({"error": "Not found"}, 404)
+            return
+
         # ─── GET /api/iac-terraform-stream (SSE) ───
         if path == "/api/iac-terraform-stream":
             env = params.get("env", ["dev"])[0]

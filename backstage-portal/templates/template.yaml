@@ -115,7 +115,7 @@ spec:
   # STEPS: Backend thực thi
   # ════════════════════════════════════════════════════════════
   steps:
-    # Chạy Terraform (đọc Vault + gen tfvars + apply)
+    # Chạy Terraform (đọc Vault + inject TF_VAR + apply)
     - id: terraform
       name: 🚀 Deploy Infrastructure
       action: iac:terraform
