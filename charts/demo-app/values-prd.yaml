@@ -2,7 +2,7 @@
 # PRODUCTION values for demo-app
 # Promotion: Jenkins job "Promote to PRD" sẽ cập nhật tag
 # =============================================================================
-namespace: demo-app-prd
+namespace: demo-app-prd-ns
 environment: prd
 
 mysql:
@@ -31,6 +31,8 @@ backend:
     tag: latest
     pullPolicy: Always
   replicaCount: 2
+  deploymentName: demo-app-prd-deployment
+  containerName: demo-app-prd-container
   service:
     name: ecommerce-backend
     port: 8080
@@ -47,6 +49,8 @@ frontend:
     tag: latest
     pullPolicy: Always
   replicaCount: 2
+  deploymentName: demo-app-prd-frontend-deployment
+  containerName: demo-app-prd-frontend-container
   service:
     name: ecommerce-frontend
     port: 80

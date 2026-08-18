@@ -1,12 +1,11 @@
 # =============================================================================
-# Argo Rollouts: Canary deployment cho Backend
-# 10% → pause 60s → 50% → pause 60s → 100%
+# Deployment: Backend (đổi từ Rollout sang Deployment theo style mentor)
 # =============================================================================
 {{- if .Values.backend.enabled }}
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: {{ .Values.backend.service.name }}
+  name: {{ .Values.backend.deploymentName | default .Values.backend.service.name }}
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "demo-app.backendLabels" . | nindent 4 }}
@@ -38,7 +37,7 @@ spec:
               done
               echo "✅ MySQL is ready"
       containers:
-        - name: backend
+        - name: {{ .Values.backend.containerName | default "backend" }}
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           ports:
@@ -66,15 +65,4 @@ spec:
         - name: config
           configMap:
             name: ecommerce-backend-config
-  strategy:
-    canary:
-      steps:
-        - setWeight: 10
-        - pause: { duration: 60s }
-        - analysis:
-            templates:
-              - templateName: backend-error-rate-check
-        - setWeight: 50
-        - pause: { duration: 60s }
-        - setWeight: 100
 {{- end }}

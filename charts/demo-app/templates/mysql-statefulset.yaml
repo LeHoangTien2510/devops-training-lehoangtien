@@ -98,6 +98,10 @@ spec:
         - name: mysql-init
           configMap:
             name: mysql-init-scripts
+  {{- if not .Values.mysql.persistence.enabled }}
+        - name: mysql-data
+          emptyDir: {}
+  {{- end }}
   {{- if .Values.mysql.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:

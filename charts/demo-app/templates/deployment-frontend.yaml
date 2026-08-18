@@ -1,12 +1,11 @@
 # =============================================================================
-# Argo Rollouts: Blue-Green deployment cho Frontend
-# Tạo Green song song Blue → manual promote → switch traffic
+# Deployment: Frontend (đổi từ Rollout sang Deployment theo style mentor)
 # =============================================================================
 {{- if .Values.frontend.enabled }}
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: {{ .Values.frontend.service.name }}
+  name: {{ .Values.frontend.deploymentName | default .Values.frontend.service.name }}
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "demo-app.frontendLabels" . | nindent 4 }}
@@ -25,7 +24,7 @@ spec:
         app.kubernetes.io/component: frontend
     spec:
       containers:
-        - name: frontend
+        - name: {{ .Values.frontend.containerName | default "frontend" }}
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports:
@@ -34,9 +33,4 @@ spec:
               protocol: TCP
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
-  strategy:
-    blueGreen:
-      activeService: {{ .Values.frontend.service.name }}
-      previewService: {{ .Values.frontend.service.name }}-preview
-      autoPromotionEnabled: false
 {{- end }}

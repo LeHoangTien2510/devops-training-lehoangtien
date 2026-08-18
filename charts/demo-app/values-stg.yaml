@@ -2,7 +2,7 @@
 # STAGING values for demo-app
 # Promotion: Jenkins job "Promote to STG" sẽ cập nhật tag
 # =============================================================================
-namespace: demo-app-stg
+namespace: demo-app-stg-ns
 environment: stg
 
 mysql:
@@ -31,6 +31,8 @@ backend:
     tag: latest
     pullPolicy: Always
   replicaCount: 2
+  deploymentName: demo-app-stg-deployment
+  containerName: demo-app-stg-container
   service:
     name: ecommerce-backend
     port: 8080
@@ -47,6 +49,8 @@ frontend:
     tag: latest
     pullPolicy: Always
   replicaCount: 2
+  deploymentName: demo-app-stg-frontend-deployment
+  containerName: demo-app-stg-frontend-container
   service:
     name: ecommerce-frontend
     port: 80

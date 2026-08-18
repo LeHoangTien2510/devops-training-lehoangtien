@@ -2,7 +2,7 @@
 # Default values for demo-app (3-tier: Angular + Spring Boot + MySQL)
 # Jenkins sẽ tự động cập nhật tag image khi build xong
 # =============================================================================
-namespace: demo-app-dev
+namespace: demo-app-dev-ns
 environment: dev
 
 mysql:
@@ -33,6 +33,8 @@ backend:
     tag: latest
     pullPolicy: Always
   replicaCount: 2
+  deploymentName: demo-app-dev-deployment
+  containerName: demo-app-dev-container
   service:
     name: ecommerce-backend
     port: 8080
@@ -49,6 +51,8 @@ frontend:
     tag: latest
     pullPolicy: Always
   replicaCount: 2
+  deploymentName: demo-app-dev-frontend-deployment
+  containerName: demo-app-dev-frontend-container
   service:
     name: ecommerce-frontend
     port: 80

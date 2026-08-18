@@ -13,30 +13,36 @@ pipeline {
     string(name: 'TIMESTAMP', defaultValue: '', description: 'Timestamp of the build')
     string(name: 'COMMIT_NAME', defaultValue: '', description: 'The commit hash')
     string(name: 'COMMIT_MESSAGE', defaultValue: '', description: 'The commit message')
-    string(name: 'PROJECT_NAME', defaultValue: '', description: 'Name of project')
-    string(name: 'ENVIRONMENT', defaultValue: '', description: 'Environment name (e.g., dev, sit, release)')
+    string(name: 'PROJECT_NAME', defaultValue: 'demo-app', description: 'Name of project')
+    string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment name (e.g., dev, sit, release)')
     string(name: 'REPOSITORY_NAME', defaultValue: '', description: 'Repository name (e.g., release-image, sit, release)')
-    string(name: 'LOCATION', defaultValue: '', description: 'Location run cicd (e.g, Company or Client)')
+    string(name: 'LOCATION', defaultValue: 'company-side', description: 'Location run cicd (e.g, Company or Client)')
     string(name: 'PATH_NAME', defaultValue: '', description: 'Name of path')
     string(name: 'SOURCE_CODE_PATH', defaultValue: '', description: 'Name of path project')
     string(name: 'REGISTRY_URL', defaultValue: '', description: 'registry.gitlab.com')
     string(name: 'REGISTRY_AUTH', description: 'Credentials for Docker Registry')
-    string(name: 'GITLAB_ACCESS_TOKEN', description: 'Credentials for source_code')
-    string(name: 'BRANCH_CODE', defaultValue: '', description: 'Branch name (e.g., develop-release, sit-release, release-version)')
-    string(name: 'COMPANY_VAULT_ADDR', defaultValue: '', description: 'Vault string url')
-    string(name: 'COMPANY_VAULT_TOKEN', description: 'Credentials for Vault')
-    string(name: 'VAULT_PATH', defaultValue: '', description: 'Vault path')
+    string(name: 'GITLAB_ACCESS_TOKEN', description: 'Credentials for source_code (GitLab)')
+    string(name: 'GIT_REPO_URL', defaultValue: 'https://github.com/LeHoangTien2510/devops-training-lehoangtien.git', description: 'GitHub repo URL (override GitLab)')
+    string(name: 'GITHUB_TOKEN', defaultValue: 'github-token', description: 'Jenkins credential ID for GitHub PAT')
+    string(name: 'BRANCH_CODE', defaultValue: 'Week-8-CI-full', description: 'Branch name')
+    string(name: 'COMPANY_VAULT_ADDR', defaultValue: 'https://52.221.18.86:8200', description: 'Vault string url')
+    string(name: 'COMPANY_VAULT_TOKEN', defaultValue: 'vault-token', description: 'Credentials for Vault')
+    string(name: 'VAULT_PATH', defaultValue: 'secret/demo-app/mysql', description: 'Vault path')
     string(name: 'JENKINS_CLIENT_URL', defaultValue: '', description: 'URL of Jenkins client job (e.g., jenkins.example.com)')
     string(name: 'JENKINS_CLIENT_USER', defaultValue: '', description: 'Username of Jenkins client')
     string(name: 'JENKINS_CLIENT_TOKEN', defaultValue: '', description: 'API token of Jenkins client user')
-    string(name: 'COMPANY_SECRET_VAULT', defaultValue: '["DOCKER_FILE","GRUNTFILE"]', description: 'Secret form vault flags array')
-    string(name: 'COMPANY_LOCATION_VAULT', defaultValue: '["Dockerfile","Gruntfile.js"]', description: 'Location path form vault flags array')
-    string(name: 'ENABLED_STAGES', defaultValue: '["CheckSource", "GetVault"]', description: 'Comma-separated list of enabled stages')
+    string(name: 'COMPANY_SECRET_VAULT', defaultValue: '["root-password","database","username","password"]', description: 'Secret form vault flags array')
+    string(name: 'COMPANY_LOCATION_VAULT', defaultValue: '["mysql-root.txt","mysql-db.txt","mysql-user.txt","mysql-pass.txt"]', description: 'Location path form vault flags array')
+    string(name: 'ENABLED_STAGES', defaultValue: '["company-get-vault", "build-push"]', description: 'Comma-separated list of enabled stages')
     string(name: 'NODEJS_VERSION', defaultValue: 'NodeJS_18', description: 'NodeJs version')
     string(name: 'TEAMS_WEBHOOK_URL', defaultValue: '', description: 'Teams webhook url')
 
     // [MERGE] Feature Modularization Parameter
     string(name: 'MODULE_DEPLOY', defaultValue: '', description: 'Modules will deploy (e.g., backend,frontend,integration')
+    string(name: 'BUILD_TOOL', defaultValue: 'spring-boot-angular', description: 'Build tool: spring-boot-angular (new) or leave empty for Grunt/Node.js')
+    string(name: 'DOCKERHUB_CREDENTIALS', defaultValue: 'dockerhub-credentials', description: 'Jenkins credential ID for Docker Hub (username/password)')
+    string(name: 'DOCKER_BACKEND_REPO', defaultValue: 'lehoangtien2510/ecommerce-backend', description: 'Docker Hub backend repo (e.g., user/backend)')
+    string(name: 'DOCKER_FRONTEND_REPO', defaultValue: 'lehoangtien2510/ecommerce-frontend', description: 'Docker Hub frontend repo (e.g., user/frontend)')
 
     //Client information
     string(name: 'CLIENT_ENV_ACTION', defaultValue: '', description: 'Action environment (e.g., sit, uat)')
@@ -50,7 +56,7 @@ pipeline {
     string(name: 'DC_ENABLED_STAGES', defaultValue: '["GetReleaseVersion"]', description: 'Comma-separated list of enabled stages')
     string(name: 'DR_ENABLED_STAGES', defaultValue: '["GetReleaseVersion"]', description: 'Comma-separated list of enabled stages')
     //DC information
-    string(name: 'DC_KUBE_CONFIG_FILE', defaultValue: '', description: 'Kube config file of client')
+    string(name: 'DC_KUBE_CONFIG_FILE', defaultValue: 'demo-kubeconfig', description: 'Kube config file of client')
     string(name: 'DC_VAULT_ADDR', defaultValue: '', description: 'Vault string url')
     string(name: 'DC_VAULT_TOKEN', description: 'Credentials for Vault')
     string(name: 'DC_JENKINS_URL', defaultValue: '', description: 'URL of Jenkins client job (e.g., jenkins.example.com)')
@@ -74,6 +80,7 @@ pipeline {
   environment {
     PATH = "${params.NODEJS_VERSION}/bin:${PATH}" //Node Version
     TEAMS_WEBHOOK_URL = "${params.TEAMS_WEBHOOK_URL}" //Teams_webhook
+    VAULT_SKIP_VERIFY = "true" //Vault self-signed cert → bỏ qua verify TLS
   }
 
   // ---------------------------- Notification when starting pipeline ---------------------------
@@ -348,7 +355,11 @@ def runInitialization() {
   currentBuild.description = "Branch: ${params.BRANCH_CODE}"
 
   def initMessage = "Pipeline for ${params.PROJECT_NAME} ${params.ERP_APP_NAME} - ${params.ENVIRONMENT} - ${params.LOCATION} ${params.CLIENT_LOCATION} has been started."
-  office365ConnectorSend message: initMessage, status: 'STARTED', webhookUrl: "${env.TEAMS_WEBHOOK_URL}"
+  if (params.TEAMS_WEBHOOK_URL?.trim()) {
+    office365ConnectorSend message: initMessage, status: 'STARTED', webhookUrl: "${env.TEAMS_WEBHOOK_URL}"
+  } else {
+    echo initMessage
+  }
 }
 
 // Stage: Select Execution Mode
@@ -433,7 +444,10 @@ def runGetReleaseVersionInfo() {
 def runCheckoutSourceCode() {
   currentBuild.displayName = "${params.PATH_NAME} - ${params.PROJECT_NAME} - ${params.ENVIRONMENT} - ${params.LOCATION} - ${STAGE_NAME}"
   try {
-    verifyGitlabToken()
+    // Chỉ check GitLab token khi dùng GitLab mode (GIT_REPO_URL trống)
+    if (!params.GIT_REPO_URL?.trim()) {
+      verifyGitlabToken()
+    }
     checkoutSourceCode()
     retrieveCommitDetails()
   } catch (Exception e) {
@@ -528,22 +542,43 @@ def runProcessPackageJson() {
     }
 }
 
-// Stage: Grunt source
+// Stage: Build source (supports: Grunt/Node.js OR Spring Boot/Angular via BUILD_TOOL param)
 def runGruntSource() {
   currentBuild.displayName = "${params.PATH_NAME} - ${params.PROJECT_NAME} - ${params.ENVIRONMENT} - ${params.LOCATION} - ${STAGE_NAME}"
   try {
-    def gruntCommand = setupGruntEnvironment()
-    if (params.ENABLED_STAGES.contains('grunt-backend')) {
-      gruntCommand += runGruntBackend()
-    }
-    if (params.ENABLED_STAGES.contains('grunt-frontend')) {
-      gruntCommand += runGruntFrontend()
-    }
-    gruntCommand += cleanup()
-    if (env.OS_TYPE == 'linux') {
-      sh gruntCommand
+    if (params.BUILD_TOOL?.trim() == 'spring-boot-angular') {
+      // ─── Spring Boot + Angular build ───
+      def buildDir = "${params.PROJECT_NAME}-${params.ENVIRONMENT}"
+      if (params.ENABLED_STAGES.contains('grunt-backend')) {
+        sh """
+          cd ${buildDir}/src/02-backend_spring-boot-rest-api
+          chmod +x mvnw && ./mvnw package -DskipTests
+          echo "✅ Backend build success"
+        """
+      }
+      if (params.ENABLED_STAGES.contains('grunt-frontend')) {
+        sh """
+          cd ${buildDir}/src/03-frontend_angular-ecommerce
+          docker run --rm -v \$(pwd):/app -w /app node:18-alpine \
+            sh -c "npm install && npm run build"
+          echo "✅ Frontend build success"
+        """
+      }
     } else {
-      bat gruntCommand
+      // ─── Original Grunt build (giữ nguyên) ───
+      def gruntCommand = setupGruntEnvironment()
+      if (params.ENABLED_STAGES.contains('grunt-backend')) {
+        gruntCommand += runGruntBackend()
+      }
+      if (params.ENABLED_STAGES.contains('grunt-frontend')) {
+        gruntCommand += runGruntFrontend()
+      }
+      gruntCommand += cleanup()
+      if (env.OS_TYPE == 'linux') {
+        sh gruntCommand
+      } else {
+        bat gruntCommand
+      }
     }
   } catch (Exception e) {
     captureStageError('Grunt source', e)
@@ -588,7 +623,12 @@ ${buildCommand}
     if (params.ENABLED_STAGES.contains('build-config-push')) {
       // env.IMAGETAG đã được set bởi buildAndPushConfiguredImage() với đúng timestamp
       imageTag = env.IMAGETAG
+    } else if (params.REGISTRY_URL?.contains('docker.io') || params.REGISTRY_URL?.contains('dockerhub') || params.REGISTRY_URL?.trim() == '') {
+      // ─── Docker Hub mode: khớp với buildAndPushImage() ───
+      imageTag = params.DOCKER_BACKEND_REPO?.trim() ? "${params.DOCKER_BACKEND_REPO}:${params.ENVIRONMENT}-${env.BUILD_ID}" : "${params.PROJECT_NAME}:${params.ENVIRONMENT}-${env.BUILD_ID}"
+      env.IMAGETAG = imageTag
     } else {
+      // ─── GitLab registry mode (giữ nguyên) ───
       def imageBasePath = "${REGISTRY_URL}/"
       if (PATH_NAME?.trim()) {
         imageBasePath += "${PATH_NAME}/"
@@ -817,7 +857,11 @@ def runWorkFlowProcess() {
 // Post-Success Action
 def runPostSuccess() {
   def successMessage = "${params.ERP_APP_NAME} - ${currentBuild.displayName} --- succeeded!"
-  office365ConnectorSend message: successMessage, status: 'SUCCESS', webhookUrl: "${env.TEAMS_WEBHOOK_URL}"
+  if (params.TEAMS_WEBHOOK_URL?.trim()) {
+    office365ConnectorSend message: successMessage, status: 'SUCCESS', webhookUrl: "${env.TEAMS_WEBHOOK_URL}"
+  } else {
+    echo successMessage
+  }
 }
 
 // Post-Failure Action
@@ -869,16 +913,20 @@ def runPostFailure() {
     ]
   ]
 
-  try {
-    httpRequest(
-      httpMode: 'POST',
-      contentType: 'APPLICATION_JSON',
-      requestBody: JsonOutput.toJson(payload),
-      url: "${env.TEAMS_WEBHOOK_URL}",
-      ignoreSslErrors: true
-    )
-  } catch (Exception webhookEx) {
-    echo "WARNING: Failed to send detailed error to webhook: ${webhookEx.getMessage()}"
+  if (params.TEAMS_WEBHOOK_URL?.trim()) {
+    try {
+      httpRequest(
+        httpMode: 'POST',
+        contentType: 'APPLICATION_JSON',
+        requestBody: JsonOutput.toJson(payload),
+        url: "${env.TEAMS_WEBHOOK_URL}",
+        ignoreSslErrors: true
+      )
+    } catch (Exception webhookEx) {
+      echo "WARNING: Failed to send detailed error to webhook: ${webhookEx.getMessage()}"
+    }
+  } else {
+    echo "❌ Pipeline failed at: ${failedStage} - ${errorMsg}"
   }
 }
 
@@ -957,21 +1005,42 @@ def verifyGitlabToken() {
 }
 
 def checkoutSourceCode() {
-  withCredentials([string(credentialsId: "${params.GITLAB_ACCESS_TOKEN}", variable: 'GITLAB_ACCESS_TOKEN')]) {
-    checkout([
-      $class: 'GitSCM',
-      branches: [[name: "$pipelineBranchCode"]],
-      doGenerateSubmoduleConfigurations: false,
-      extensions: [
-        [$class: 'RelativeTargetDirectory', relativeTargetDir: "${params.PROJECT_NAME}-${params.ENVIRONMENT}"]
-      ],
-      submoduleCfg: [],
-      userRemoteConfigs: [
-        [
-          url: "https://oauth2:${GITLAB_ACCESS_TOKEN}@gitlab.com/${SOURCE_CODE_PATH}.git"
-        ]
-      ]
-    ])
+  // Hỗ trợ cả GitHub (GIT_REPO_URL) và GitLab (GITLAB_ACCESS_TOKEN + SOURCE_CODE_PATH)
+  if (params.GIT_REPO_URL?.trim()) {
+    // ─── GitHub mode ───
+    if (params.GITHUB_TOKEN?.trim()) {
+      withCredentials([string(credentialsId: "${params.GITHUB_TOKEN}", variable: 'GH_TOKEN')]) {
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: "$pipelineBranchCode"]],
+          doGenerateSubmoduleConfigurations: false,
+          extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${params.PROJECT_NAME}-${params.ENVIRONMENT}"]],
+          submoduleCfg: [],
+          userRemoteConfigs: [[url: "${params.GIT_REPO_URL.replace('https://', 'https://' + GH_TOKEN + '@')}"]]
+        ])
+      }
+    } else {
+      checkout([
+        $class: 'GitSCM',
+        branches: [[name: "$pipelineBranchCode"]],
+        doGenerateSubmoduleConfigurations: false,
+        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${params.PROJECT_NAME}-${params.ENVIRONMENT}"]],
+        submoduleCfg: [],
+        userRemoteConfigs: [[url: "${params.GIT_REPO_URL}"]]
+      ])
+    }
+  } else {
+    // ─── GitLab mode (giữ nguyên) ───
+    withCredentials([string(credentialsId: "${params.GITLAB_ACCESS_TOKEN}", variable: 'GITLAB_ACCESS_TOKEN')]) {
+      checkout([
+        $class: 'GitSCM',
+        branches: [[name: "$pipelineBranchCode"]],
+        doGenerateSubmoduleConfigurations: false,
+        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${params.PROJECT_NAME}-${params.ENVIRONMENT}"]],
+        submoduleCfg: [],
+        userRemoteConfigs: [[url: "https://oauth2:${GITLAB_ACCESS_TOKEN}@gitlab.com/${SOURCE_CODE_PATH}.git"]]
+      ])
+    }
   }
 }
 
@@ -1040,30 +1109,76 @@ def getNamingContext() {
 
 // ------------------------------ Build and push image ----------------------------------------
 def prepareDockerConfig() {
-  withCredentials([file(credentialsId: "${params.REGISTRY_AUTH}", variable: 'REGISTRY_AUTH')]) {
-    sh """
-      cat ${REGISTRY_AUTH} > ~/.docker/config.json
-      cd ${params.PROJECT_NAME}-${params.ENVIRONMENT}/
-      echo "Dockerfile" > .dockerignore
-    """
+  if (params.REGISTRY_URL?.contains('docker.io') || params.REGISTRY_URL?.contains('dockerhub') || params.DOCKERHUB_CREDENTIALS?.trim()) {
+    // ─── Docker Hub login ───
+    withCredentials([usernamePassword(credentialsId: "${params.DOCKERHUB_CREDENTIALS ?: params.REGISTRY_AUTH}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+      sh "echo \${DH_PASS} | docker login -u \${DH_USER} --password-stdin"
+    }
+  } else {
+    // ─── GitLab registry login (giữ nguyên) ───
+    withCredentials([file(credentialsId: "${params.REGISTRY_AUTH}", variable: 'REGISTRY_AUTH')]) {
+      sh """
+        cat ${REGISTRY_AUTH} > ~/.docker/config.json
+        cd ${params.PROJECT_NAME}-${params.ENVIRONMENT}/
+        echo "Dockerfile" > .dockerignore
+      """
+    }
   }
 }
 def buildAndPushImage() {
-  def imagePath = "${REGISTRY_URL}/"
-  if (PATH_NAME?.trim()) {
-    imagePath += "${PATH_NAME}/"
-  }
-  imagePath += "${REPOSITORY_NAME}/${params.PROJECT_NAME}:${params.ENVIRONMENT}-${env.BUILD_ID}"
+  def imagePath
+  if (params.REGISTRY_URL?.contains('docker.io') || params.REGISTRY_URL?.contains('dockerhub') || params.REGISTRY_URL?.trim() == '') {
+    // ─── Docker Hub mode: build backend + frontend ───
+    def commands = ""
 
-  def buildCommand = """
-    echo "Commit hash is: ${env.COMMIT_NAME}"
-    echo "Commit message is: ${env.COMMIT_MESSAGE}"
-    cd ${params.PROJECT_NAME}-${params.ENVIRONMENT}/
-    docker build -t ${imagePath} .
-    docker push ${imagePath}
-    echo "Build and push image success"
-  """
-  return buildCommand
+    // ── Backend ──
+    def backendRepo = params.DOCKER_BACKEND_REPO?.trim()
+    def backendContext = "${params.PROJECT_NAME}-${params.ENVIRONMENT}/src/02-backend_spring-boot-rest-api"
+    if (backendRepo && !fileExists("${backendContext}/Dockerfile")) {
+      backendContext = "${params.PROJECT_NAME}-${params.ENVIRONMENT}"
+    }
+    if (backendRepo) {
+      def backendTag = "${backendRepo}:${params.ENVIRONMENT}-${env.BUILD_ID}"
+      commands += """
+        echo "→ Building backend: ${backendTag}"
+        (cd ${backendContext} && docker build -t ${backendTag} . && docker push ${backendTag})
+        echo "✅ Backend pushed: ${backendTag}"
+      """
+      env.BACKEND_IMAGETAG = backendTag
+      env.IMAGETAG = backendTag
+    }
+
+    // ── Frontend ──
+    def frontendRepo = params.DOCKER_FRONTEND_REPO?.trim()
+    def frontendContext = "${params.PROJECT_NAME}-${params.ENVIRONMENT}/src/03-frontend_angular-ecommerce"
+    if (frontendRepo && !fileExists("${frontendContext}/Dockerfile")) {
+      frontendContext = "${params.PROJECT_NAME}-${params.ENVIRONMENT}"
+    }
+    if (frontendRepo) {
+      def frontendTag = "${frontendRepo}:${params.ENVIRONMENT}-${env.BUILD_ID}"
+      commands += """
+        echo "→ Building frontend: ${frontendTag}"
+        (cd ${frontendContext} && docker build -t ${frontendTag} . && docker push ${frontendTag})
+        echo "✅ Frontend pushed: ${frontendTag}"
+      """
+      env.FRONTEND_IMAGETAG = frontendTag
+    }
+
+    return commands
+  } else {
+    // ─── GitLab registry mode (giữ nguyên) ───
+    imagePath = "${REGISTRY_URL}/"
+    if (PATH_NAME?.trim()) { imagePath += "${PATH_NAME}/" }
+    imagePath += "${REPOSITORY_NAME}/${params.PROJECT_NAME}:${params.ENVIRONMENT}-${env.BUILD_ID}"
+    return """
+      echo "Commit hash is: ${env.COMMIT_NAME}"
+      echo "Commit message is: ${env.COMMIT_MESSAGE}"
+      cd ${params.PROJECT_NAME}-${params.ENVIRONMENT}/
+      docker build -t ${imagePath} .
+      docker push ${imagePath}
+      echo "Build and push image success"
+    """
+  }
 }
 
 def buildAndPushConfiguredImage() {
@@ -1360,6 +1475,11 @@ def sendConfigureLogToWebhook(logContent, successCount, failedCount, totalCount,
     ]
   ]
 
+  if (!params.TEAMS_WEBHOOK_URL?.trim()) {
+    echo "No Teams webhook configured, skipping."
+    return
+  }
+
   try {
     httpRequest(
       httpMode: 'POST',
@@ -1505,6 +1625,10 @@ def runUnitTestsOnPod(podName) {
 
 def sendLogToTeams(logContent, stageType) {
     def webhookUrl = "${env.TEAMS_WEBHOOK_URL}"
+    if (!params.TEAMS_WEBHOOK_URL?.trim()) {
+        echo "No Teams webhook configured, skipping unit test log."
+        return
+    }
     def payload = [
         "@type"   : "MessageCard",
         "@context": "http://schema.org/extensions",
